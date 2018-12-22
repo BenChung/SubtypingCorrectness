@@ -3,10 +3,18 @@
 %This is a template for producing LIPIcs articles. 
 %See lipics-manual.pdf for further information.
 %for A4 paper format use option "a4paper", for US-letter use option "letterpaper"
-%for british hyphenation rules use option "UKenglish", for american hyphenation rules use option "USenglish"
+%for british hyphenation rules use option "UKenglish", for american hyphenation rules use option "USenglish",
 % for section-numbered lemmas etc., use "numberwithinsect"
 
-\usepackage{microtype}%if unwanted, comment out or use option "draft"
+\usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir}%if unwanted, comment out or use option "draft"
+\newcommand{\xt}[1]{\texttt{#1}}
+\newcommand{\tupleo}[1]{\xt{Tuple1\{}#1\xt{\}}}
+\newcommand{\tuplet}[2]{\xt{Tuple2\{}#1,#2\xt{\}}}
+\newcommand{\union}[2]{\xt{Union\{}#1,#2\xt{\}}}
+\newcommand{\denotes}[1]{\llbracket #1 \rrbracket}
+
+\newcommand{\bsub}{<:_b}
+\newcommand{\nsub}{<:_n}
 
 %\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
 
@@ -22,7 +30,7 @@
 
 \author{Jan Vitek}{Northeastern University \& Czech Technical University}{}{}{}
 
-\authorrunning{B. Chung, F. Zappa Nardelli, J. Vitek}%mandatory. First: Use abbreviated first/middle names. Second (only in severe cases): Use first author plus 'et al.'
+\authorrunning{B. Chung, F. Zappa Nardelli, J. Vitek}%mandatory. First: Use abbreviated first/middle names. Second (only i,n severe cases): Use first author plus 'et al.'
 
 \Copyright{Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, please use full first names. LIPIcs license is "CC-BY";  http://creativecommons.org/licenses/by/3.0/
 
@@ -59,6 +67,245 @@
 \begin{document}
 
 \maketitle
+\begin{abstract}
+We describe a novel algorithm for deciding subtyping for a type language consisting
+of tuples, unions, and existential type variables without normalization and requiring
+space linear in the size of the input types. We prove algorithmic correctness with 
+respect to a semantic notion of subtyping using a proof assistant. Finally, we examine
+the algorithm's use in the Julia programming language.
+\end{abstract}
 
+\section{Introduction}
+
+Deciding subtyping relationships between types in complex type systems is  a
+challenging problem. Despite the near-ubiquity of subtyping (or analogous
+relation)  in practical programming languages, subtyping is a notoriously
+difficult property to  establish for many type languages; in particular when
+semantic subtyping is desired or in the presence of type variables.
+
+The classic result in subtyping with variables is a good illustration of this
+difficulty. System $F_{<:}$, system F extended with subtyping and variable
+bounds, was long thought to be decidable. However, Pierce (1993, CITEME)
+reduced turing machines to System $F_{<:}$ terms, demonstrating that it is
+fully undecidable whether one system $F_{<:}$ type is a subtype of another.
+
+Since this result, much type system design effort has been spent on avoiding
+this precise issue. In spite of --- or perhaps as indicated by --- this
+effort, however, decision  procedures for subtyping are still relatively
+uncommon and complex.
+
+Of particular note is semantic subtyping, which defines the subtyping
+relationship as existing when the set of values denoted by one type is a
+subset of the other. When combined with unions and type variables, the
+sets of values denoted by particular types can become very difficult to compute
+and compare, leading to substantial complexity (Sam TH paper).
+
+Prior approaches to computing subtyping relationships with unions and other
+types have substantial issues. Prior approaches are able to handle the
+combination of unions and tuples (cite), but do so using normalization. As a
+result, they require memory exponential in the number of unions, leading to
+poor performance. Additionally, when type variables are added to the language,
+it becomes impossible to normalize terms while retaining all possibilities and
+therefore prior work is incomplete.
+
+In this paper, we present an algorithm for deciding subtyping between types
+that contain tuples, semantic unions, and existential type variables and
+describe its operation. We also provide and describe a proof of correctness of
+the core of this algorithm using both semantic and efficient internal state
+representations. Finally, we describe its use in the Julia programming
+language, which uses this algorithm to decide subtyping relationships as part
+of its semantics.
+
+\section{Prior Work}
+
+\section{Unions and Tuples}
+
+We begin with a presentation of the algorithm on the language limited to unions
+and tuples. We then describe and show the proof of correctness of the algorithm
+for this language, then discuss how it can be extended to handle existential type
+variables.
+
+\begin{figure}
+\begin{align*}
+\xt{t} := & \xt{A},\xt{B},\xt{C},\xt{D} \\
+&| \union{\xt t}{\xt t} \\
+&| \tupleo{\xt t} \\
+&| \tuplet{\xt t}{\xt t} \\
+\end{align*}
+\caption{The language of unions and tuples}
+\label{fig:unionlang}
+\end{figure}
+
+In order to describe semantic subtyping for this language, we will need a
+notion of type-set equivalences. For this small language, it can be defined
+straightforwardly as:
+
+\begin{align*}
+\denotes{\xt{A}} &= \{A\} \\
+\denotes{\union{t_1}{t_2}} &= \denotes{t1} \cup \denotes{t2} \\
+\denotes{\tupleo{t}} &= \{\tupleo{t'} | t' \in \denotes{t}\} \\
+\denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} | t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
+\end{align*}
+
+We want to be able to decide semantic subtyping relations for this language,
+defined as if $\denotes{t_1} \subseteq \denotes{t_2}$, then $t_1 <: t_2$. This
+leads us to definition~\ref{dfn:scr} as our correctness criteria for subtyping
+relations.
+
+\begin{definition}[Subtyping Correctness]
+A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
+\exists t_2' \in \denotes{t_2}, t_1 \bsub t_2$.
+\label{dfn:scr}
+\end{definition}
+
+This definition of subtyping is canonicalized in our Coq proof as the
+\texttt{NormalSubtype} relation. A correct subtyping algorithm \texttt{subtype} in Coq
+will have the type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|,
+indicating that for any pair of types, it can decide whether they are or are not a subtype 
+under definition~\ref{dfn:scr}.
+
+The classical subtyping relation for unions does not satisfy
+definition~\ref{dfn:scr}, even on this limited type language. We depict the
+standard definition of subtyping in figure~\ref{fig:typsub}. The problem with
+this definition arises from the combination of unions and tuples in non-normal
+form.
+
+\begin{figure}
+\begin{mathpar}
+\inferrule{ }{A \bsub A}
+
+\inferrule{t \bsub t_1}{t \bsub \union{t_1}{t_2}}
+
+\inferrule{t \bsub t_2}{t \bsub \union{t_1}{t_2}}
+
+\inferrule{t_1 \bsub t \\ t_2 \bsub t}{\union{t_1}{t_2} \bsub t}
+
+\inferrule{t_1 \bsub t_2}{\tupleo{t_1} \bsub \tupleo{t_2}}
+
+\inferrule{t_1 \bsub t_2 \\ t_1' \bsub t_2'}{\tuplet{t_1}{t_1'} \bsub \tuplet{t_2}{t_2'}}
+\end{mathpar}
+\caption{Typical subtyping rules for tuples and unions}
+\label{fig:typsub}
+\end{figure}
+
+To illustrate the problem, consider deciding the subtyping relation
+$\tupleo{\union{\xt{A}}{\xt{B}}} <: \union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}$.
+If we look at it denotationally, it is evident that
+$\denotes{\tupleo{\union{\xt{A}}{\xt{B}}}} =
+\{\tupleo{\xt{A}},\tupleo{\xt{B}}\}$, that
+$\denotes{\union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}} =
+\{\tupleo{\xt{A}},\tupleo{\xt{B}}\}$, and therefore that the subtyping
+relation should hold. However, if we attempt to use the above rules to decide
+this subtyping relation, we end up with one of two faulty derivations:
+
+\begin{mathpar}
+\inferrule*{
+		\inferrule*{
+				\inferrule*{\xt{A} \bsub \xt{A} \\ \xt{B} \not\bsub \xt{A}}{\union{\xt{A}}{\xt{B}} \bsub \xt{A}}} 
+		{\tupleo{\union{\xt{A}}{\xt{B}}} \bsub \tupleo{\xt{A}}}}
+{\tupleo{\union{\xt{A}}{\xt{B}}} \bsub \union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}}
+
+\inferrule*{
+		\inferrule*{
+				\inferrule*{\xt{A} \not\bsub \xt{B} \\ \xt{B} {\bsub} \xt{B}}{\union{\xt{A}}{\xt{B}} \bsub \xt{B}}} 
+		{\tupleo{\union{\xt{A}}{\xt{B}}} \bsub \tupleo{\xt{B}}}}
+{\tupleo{\union{\xt{A}}{\xt{B}}} \bsub \union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}}
+\end{mathpar}
+
+The problem with this relation is that the straightforward algorithm ``jumps
+to conclusions'' about what choice is to be made for the union on the right
+hand side. Eventually, it reaches a point where whatever choice is made at the
+top level is invalidated.
+
+To solve this problem, other approaches normalize the type on the left hand
+side, bringing the union to the outermost position. Normalization will convert
+the relation to $\union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}} \bsub
+\union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}$, and the relation will hold. However,
+all unions within the type must be eliminated in this process, and therefore all 
+possible choices of the unions must be expanded. As a result, the size of the 
+types under consideration becomes exponential in the number of unions within
+the types and the algorithm needs exponential space to store the types being
+compared.
+
+We present an algorithm to decide subtyping relations for this type language
+that is able to satisfy the correctness criteria and is able to successfully
+determine that these two types are subtypes. Moreover, this algorithm is able
+to decide subtyping for this language using linear space (though exponential
+time) over the number of unions in the type.
+
+\subsection{Normalization}
+
+In order to correctly decide subtyping, it is necessary to explore each decision
+made at each union. First, we will examine how normalization accomplishes this,
+then describe how our iterator-or-stack based approach achieves the same result
+without needing to store or generate a large type.
+
+To enable the typical algorithm to explore all possible choices at unions, the
+normalization approach lifts all unions to the top level. To do this, it
+computes the set of types corresponding to all possible choices for unions
+embedded in the term, then adds a top-level union that enables the selection
+of any one of the choices. 
+
+For this simple type language, normalization is equivalent to computing the
+denotation set for the type. We define a metafunction \texttt{normalize}:
+
+\[
+\xt{normalize}(t) = \xt{Union}\{\denotes{t}\}
+\]
+
+For convenience of notation, we elide the nested unions that would be needed
+if $|\denotes{t}| > 2$ and that if $|\denotes{t}| = 1$ then no union will be
+generated.
+
+We can then define a correct semantic subtyping relation for our type
+language using this metafunction. (TODO: subscript the subtype relations)
+
+\begin{mathpar}
+\inferrule{\xt{normalize}(t_1) \bsub \xt{normalize}(t_2)}{t_1 \nsub t_2}
+\end{mathpar}
+
+This normalization-based subtyping relation satisfies definition~\ref{dfn:scr}.
+
+\begin{theorem}[Correctness of Normalization-Based Subtyping]
+$t_1 \nsub t_2$ iff $\forall t_1' \in \denotes{t_1},
+\exists t_2' \in \denotes{t_2}, t_1 \bsub t_2$
+\end{theorem}
+\begin{proof}
+See the Coq implementation of \verb|normalize_subtype|. 
+\end{proof}
+
+However, the normalization process is both space intensive (as all unions must
+be expanded) and is incompatible with the existential type variables that will
+be introduced later. To address these issues, we present an algorithm that can
+decide correct subtyping without needing to expand the types being compared.
+
+\subsection{Iterators}
+
+To explain the operation of the iterator-based algorithm for subtyping, we
+will begin with an examination of how the normalization algorithm actually
+decides subtyping. Consider the original problematic relation 
+$\tupleo{\union{\xt{A}}{\xt{B}}} \nsub \union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}$, which
+is expanded by normalization to $\union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}} \bsub
+\union{\tupleo{\xt{A}}}{\tupleo{\xt{B}}}$. The normalization process brought all inner
+unions to the top level, which allowed the basic subtyping algorithm to examine all options
+without running into structural limitations.
+
+The iterator-based algorithm for subtyping replaces normalization (computing all options
+in one go) with an incremental approach to exploring choices made at unions. It represents
+a specific set of choices at a union as a state of an iterator, which will iterate through
+all possible choices of union. On top of this, we can define an algorithm for deciding correct
+subtyping.
+
+We have implemented the iterator-based subtyping algorithm in Coq, and will
+present its implementation.
+
+\begin{verbatim}
+Inductive TypeIterator: type -> Set :=
+| TIAtom : forall i, TypeIterator (atom i)
+| TITuple1 : forall tp, TypeIterator tp -> TypeIterator (tuple1 tp)
+| TITuple2 : forall t1 t2, TypeIterator t1 -> TypeIterator t2 -> TypeIterator (tuple2 t1 t2)
+| TIUnionL : forall t1 t2, TypeIterator t1 -> TypeIterator (union t1 t2)
+| TIUnionR : forall t1 t2, TypeIterator t2 -> TypeIterator (union t1 t2).
+\end{verbatim}
 
 \end{document}
