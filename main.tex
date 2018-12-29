@@ -296,6 +296,8 @@ a specific set of choices at a union as a state of an iterator, which will itera
 all possible choices of union. On top of this, we can define an algorithm for deciding correct
 subtyping.
 
+\subsubsection{Infrastructure}
+
 We have implemented the iterator-based subtyping algorithm in Coq, and will
 present its implementation.
 
@@ -307,5 +309,259 @@ Inductive TypeIterator: type -> Set :=
 | TIUnionL : forall t1 t2, TypeIterator t1 -> TypeIterator (union t1 t2)
 | TIUnionR : forall t1 t2, TypeIterator t2 -> TypeIterator (union t1 t2).
 \end{verbatim}
+
+Members of the \verb|TypeIterator t| type are iterator states for a type
+\verb|t|. An iterator state is a traversal of the type tree from the root to a leaf
+(for our type language, an atom), and each state describes a set of choices to take
+at each union (denoted by \verb|TIUnionL| and \verb|TIUnionR|). Using a \verb|TypeIterator t|,
+we can subset a source type to eliminate all unions (which we denote as the current type) with
+a function as follows:
+
+\begin{verbatim}
+Fixpoint current (t:type)(ti:TypeIterator t):type :=
+match ti with
+| TIAtom i => atom i
+| TITuple1 tip p => tuple1 (current tip p)
+| TITuple2 ti1 ti2 p1 p2 => tuple2 (current ti1 p1) (current ti2 p2)
+| TIUnionL ti1 ti2 pl => (current ti1 pl)
+| TIUnionR ti1 ti2 pr => (current ti2 pr)
+end.
+\end{verbatim}
+
+Next, we need to define the operations that make a \verb|TypeIterator| into an actual
+iterator. In particular, we need to be able to find an initial state and then a function
+that steps through all possible states from that initial state. We define our initial state
+as the state where we only take the leftmost branch on all unions, and then steps ``rightize''
+the iterator from there.
+
+\begin{verbatim}
+Fixpoint start_iterator (t:type):TypeIterator t :=
+  match t with
+  | (atom i) => TIAtom i
+  | (tuple1 t) => TITuple1 t (start_iterator t)
+  | (tuple2 t1 t2) => TITuple2 t1 t2 (start_iterator t1) (start_iterator t2)
+  | (union t1 t2) => TIUnionL t1 t2 (start_iterator t1)
+  end.
+\end{verbatim}
+
+Correctness for \verb|start_iterator| is simple.
+
+\begin{theorem}
+Every type in $\denotes{t}$ will be explored by \verb|start_iterator t| 
+\end{theorem}
+\begin{proof}
+See \verb|iterator_has_clauses| in the Coq proof.
+\end{proof}
+
+\begin{verbatim}
+Fixpoint next_state (t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
+  match ti with
+  | TIAtom i => None
+  | TITuple1 tip p => option_map (TITuple1 tip) (next_state tip p)
+  | TITuple2 ti1 ti2 p1 p2 =>
+    match (next_state ti2 p2) with
+    | Some np2 => Some(TITuple2 ti1 ti2 p1 np2)
+    | None =>
+      match (next_state ti1 p1) with
+      | Some np1 => Some(TITuple2 ti1 ti2 np1 (start_iterator ti2))
+      | None => None
+      end
+    end
+  | TIUnionL ti1 ti2 pl =>
+    match (next_state ti1 pl) with
+    | Some npl => Some(TIUnionL ti1 ti2 npl)
+    | None => Some(TIUnionR ti1 ti2 (start_iterator ti2))
+    end
+  | TIUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next_state ti2 pr)
+  end.
+\end{verbatim}
+
+\verb|next_state| returns \verb|Some s| if there is some successor state
+\verb|s| to the current, and \verb|None| if the given iterator state is
+terminal. It will go left-to-right through unions, and will explore 2-tuples
+by iterating through the choices on the right for each choice on the left.
+This definition leads us to the Coq induction principle over iterators.
+
+\begin{theorem}
+\begin{verbatim}
+Definition iter_rect
+  (t:type) (P:TypeIterator t -> Set)
+           (pi: forall it, next_state t it = None -> P it)
+           (ps : forall it' it'', P it'' -> next_state t it' = Some it'' -> P it')
+           (it : TypeIterator t) : P it  
+\end{verbatim}
+
+For any type \verb|t| and proposition \verb|P|, and if:
+\begin{itemize} 
+	\item \verb|P| holds for an iterator that has no next state (e.g. is done)
+	\item if \verb|P| holds for the \emph{following} iterator state \verb|it|,
+	then \verb|P| holds for the \emph{preceeding} iterator state \verb|it'|.
+\end{itemize}
+Then \verb|P| holds for all iterators for type \verb|t|
+\end{theorem}
+\begin{proof}
+See the Coq proof for this paper.
+\end{proof}
+
+This definition provides us with both a useful correctness property as well as
+a termination argument, as the principle is in \verb|Set|. We use this
+induction principle to define decidable implementations of subtyping using
+iterators. For details  of this use, see the associated Coq code.
+
+The correctness properties we are interested in require reasoning about the
+entire set of types that is explored by the iterator. As a result, we need a
+propoisitional form that describes all types that remain to be explored by the
+iterator, which we refer to as  \verb|Remaining|. We will not provide the
+complete definition of \verb|Remaining| here,  but the informal definition is
+that if \verb|Remaining t it l|, then the type iterator \verb|it| for type
+\verb|t| will encounter \verb|l| different types before it can no longer be
+stepped.  
+
+\subsubsection{Subtyping with Iterators}
+
+With this, we can define the core decision procedures of the subtyping
+algorithm. We will first define the right-hand-side check, the exists check,
+that for some fixed left-hand-side type finds if there exists some instantiation
+on the right hand side that is a subtype. Then, we will use this to define the overall
+subtyping algorithm, which checks that for every instantiation on the left hand side
+there exists an instantiation on the right hand side.
+
+To show correctness of the exists check (on the right hand side) algorithm, we will
+prove an inner property (that is well-suited to our induction principle), then use that
+lemma to show that there is a decision procedure for the full exists-side check. The 
+inner property we desire is that for any iterator state \verb|it| of type \verb|t|, it
+is possible to decide whether the iterator will encounter an element that is a supertype
+of the left-hand-side or not. In Coq, this is represented as
+
+\begin{verbatim}
+Definition exists_iter_inner(a b : type)(it:TypeIterator b) :
+  ({ t | forall l, Remaining b it l -> In t l /\ BaseSubtype a t } +
+   {forall t l, Remaining b it l -> In t l -> ~(BaseSubtype a t) }).
+\end{verbatim}
+
+Using this - and knowing that we can prove that \verb|start_iterator| has
+every type choice possible remaining - we can show that we can decide whether
+any possible choice of type \verb|b| is a supertype of our reference type
+\verb|a| on the left-hand-side or not. This decision procedure is \verb|exists_iter|,
+and for implementation details see the Coq proof.
+
+\begin{verbatim}
+Definition exists_iter(a b : type) : 
+  ({ t | InType t b /\ BaseSubtype a t } +
+   {forall t, InType t b -> ~(BaseSubtype a t) }).
+\end{verbatim}
+
+We can then prove equivalent decision procedures for the left-hand-side of the
+relation. We now want to prove that for every choice we make on the left-hand-side,
+there exists some choice that produces a supertype on the right-hand-side. 
+
+\begin{verbatim}
+Definition forall_iter_inner (a b : type) (it : TypeIterator a) :
+  { forall l, Remaining a it l ->
+              forall t, In t l ->
+                        exists t', InType t' b /\ (BaseSubtype t t')} +
+  { forall l, Remaining a it l ->
+              exists t, In t l /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
+\end{verbatim}
+
+We then use this to prove the final iterator, running the intermediate result from
+the initial state:
+
+\begin{verbatim}
+Definition forall_iter (a b : type) :
+  { forall t, In t (clauses a) -> exists t', InType t' b /\ (BaseSubtype t t')} +
+  { exists t, In t (clauses a) /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
+\end{verbatim}
+
+Finally, we can define a decidable function (called \verb|subtype| in the proof)
+that decides whether two types are subtypes or not. \verb|subtype| simply invokes
+\verb|forall_iter| to decide subtyping.
+
+\begin{verbatim}
+Definition subtype(a b:type) : {NormalSubtype a b} + {~NormalSubtype a b}.
+  destruct (forall_iter a b).
+  - left. [...]
+  - right. [...]
+Defined.
+\end{verbatim}
+
+Therefore, using iterators, we can decide whether subtyping holds for any two types
+in our language. We will now show an equivalence between iterators and stacks-of-choices,
+allowing for more efficient implementation.
+
+\subsection{Stacks-as-Iterators}
+
+The equivalence of stacks (or lists of choices) and type iterators arises from
+the design of our iterators. Each iterator state represents a set of choices
+made at each  union inside the type, choices that could also be recorded as
+simple boolean values. If we fix the type under consideration and perform an
+inorder traversal of the iterator, we can construct a bijective mapping
+between instances of \verb|TypeIterator t| and  \verb|list bool|. We can then
+use this mapping to define and prove correct an alternative algorithm for
+deciding subtyping for our type language that does not need the full iterator.
+
+To start with, we will begin by describing the mapping between iterators and
+stacks (or lists of choices). In the accompanying Coq code, we define
+\verb|st_context| (or subtype contexts) as \verb|list bool|.
+
+To illustrate the equivalence between choice stacks and iterators, we will
+first present the \verb|lookup_path| and \verb|iterator_to_path| operations;
+these operations lookup the current type based on a path and which convert an
+iterator to a choice stack, respectively. 
+
+\begin{verbatim}
+Fixpoint lookup_path(t:type)(p:st_context) : type * st_context :=
+  match t, p with
+  | atom i, _ => (t, p)
+  | tuple1 t, _ => let (r,p) := lookup_path t p in (tuple1 r, p)
+  | tuple2 t1 t2, _ =>
+    let (r1,p1) := lookup_path t1 p in
+    let (r2,p2) := lookup_path t2 p1 in
+    (tuple2 r1 r2, p2)
+  | union l r, false::rs => lookup_path l rs
+  | union l r, true::rs => lookup_path r rs
+  | _, nil => (t, nil)
+  end.
+\end{verbatim}
+
+\verb|lookup_path| takes both a type and a subtype context (or choice stack)
+and returns the combination of the now-unionless type and whatever of the
+choice stack was left over. This ``tail'' is necessary in order to handle
+tuples, whose right branch is now simply concatenated onto the left branch's
+choice stack (and is therefore a postfix of the left branch's). Comparing
+\verb|lookup_path| (for choice stacks) and \verb|current| (for iterators), 
+they share the same structure. The only differences are the sequential handling
+of tuples and the use of the choice stack instead of TIUnionL/TIUnionR for
+choosing branches of unions.
+
+\begin{verbatim}
+Fixpoint iterator_to_path(t:type)(it:TypeIterator t):st_context :=
+   match it with
+   | TIAtom _ => nil
+   | TITuple1 tp it1 => iterator_to_path tp it1
+   | TITuple2 t1 t2 it1 it2 => (iterator_to_path t1 it1) ++ (iterator_to_path t2 it2)
+   | TIUnionL t1 _ it1 => false :: (iterator_to_path t1 it1)
+   | TIUnionR _ t2 it1 => true :: (iterator_to_path t2 it1)
+   end.
+\end{verbatim}
+
+With this similarity in mind, we can now look at how to convert an iterator to
+a choice stack, implemented as \verb|iterator_to_path|. The conversion
+proceeds structurally, with tuples-equivalent-stacks concatenated onto one
+another and union choices producing false (for left-choice) and true (for
+right-choice). These definitions then let us pose a basic correctness theorem
+for this new representation:
+
+\begin{lemma}[Iterator to path is correct]
+\begin{verbatim}
+Lemma itp_correct : forall t it, current t it = fst (lookup_path t (iterator_to_path t it)).
+\end{verbatim}
+
+For every type \verb|t| and type iterator \verb|it|, the iterator's current type \verb|current t it| is equal
+to the result of looking up the conversion of \verb|it| to a choice stack.
+\end{lemma}
+\begin{proof}
+See \verb|itp_correct| in the Coq proof.
+\end{proof}
 
 \end{document}
