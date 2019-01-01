@@ -504,6 +504,8 @@ To start with, we will begin by describing the mapping between iterators and
 stacks (or lists of choices). In the accompanying Coq code, we define
 \verb|st_context| (or subtype contexts) as \verb|list bool|.
 
+\subsubsection{Equivalence}
+
 To illustrate the equivalence between choice stacks and iterators, we will
 first present the \verb|lookup_path| and \verb|iterator_to_path| operations;
 these operations lookup the current type based on a path and which convert an
@@ -563,5 +565,145 @@ to the result of looking up the conversion of \verb|it| to a choice stack.
 \begin{proof}
 See \verb|itp_correct| in the Coq proof.
 \end{proof}
+
+\subsubsection{Stepping}
+
+We now need an equivalent of \verb|next_state| for choice stacks. Choice stacks
+are hard to iterate, as their length can change as they are stepped and therefore
+simple binary-number style stepping is insufficient. Instead, we implement stepping
+for choice stacks with two functions which compose into the desired step function.
+
+\begin{verbatim}
+Fixpoint flip_last_left(ls:st_context):=
+  match ls with
+  | false::rs =>
+    match flip_last_left rs with
+    | Some s => Some(false :: s)
+    | None => Some(true::nil)
+    end
+  | true::rs =>
+    match flip_last_left rs with
+    | Some s => Some(true::s)
+    | None => None
+    end
+  | nil => None
+  end.
+
+Fixpoint extend_list(t:type)(ls:st_context) :=
+  match t,ls with
+  | atom i, _ => (nil, ls)
+  | tuple1 t, _ => extend_list t ls
+  | tuple2 t1 t2, _ =>
+    let (hd1,tl1) := extend_list t1 ls in
+    let (hd2,tl2) := extend_list t2 tl1 in
+    (hd1 ++ hd2, tl2)
+  | union l r, false::rs => extend_list l rs
+  | union l r, true::rs => extend_list r rs
+  | union l r, nil =>
+    let (hd,tl) := extend_list l nil in (false :: hd, tl)
+  end.
+
+Definition step_ctx (t : type) (pth:st_context) : option st_context := 
+	option_map (fun x => x ++ (fst (extend_list t x))) (flip_last_left pth).
+\end{verbatim}
+
+\verb|flip_last_left| flips the final left (or false) in a subtype
+context into a right choice in that union, then truncates the choice 
+stack to that flipped position. This operation causes the implied iterator
+to move to the deepest possible alternative type.
+
+\verb|extend_list| pads out a given subtype context with left-choices to be a
+valid context for the given path. It will fill out a subtype environment that
+has made an alternate choice at a branch node and therefore needs to traverse
+the rest of the type tree. We combine these two operations to define
+\verb|step_ctx|, which flips the final left choice in the given context then
+extends the context to be valid for the iterated type.
+
+Correctness for \verb|step_ctx| is expressed in terms of the iterator
+\verb|next_step| operation and the \verb|iterator_to_path| operation.
+
+\begin{lemma}[Correctness of step\_ctx]
+\begin{verbatim}
+forall t it,
+    step_ctx t (iterator_to_path t it) =
+    (option_map (iterator_to_path t) (next_state t it)).
+\end{verbatim}
+For every type \verb|t| and type iterator \verb|it|,
+stepping the choice-list equivalent of \verb|it| will
+produce the same result as converting the result of stepping
+\verb|it|.
+\end{lemma}
+\begin{proof}
+See \verb|list_step_correct| in the Coq proof.
+\end{proof}
+
+We can then define the exists and forall-exists subtype decision procedures
+on top of the \verb|step_ctx| and \verb|lookup_path| operations:
+
+\begin{verbatim}
+Fixpoint ex_subtype (a b : type)(cex :st_context)(fuel:nat) : option bool :=
+  match base_subtype a (fst (lookup_path b cex)) with
+  | left _ => Some true
+  | right _ =>
+    match step_ctx b cex with
+    | Some ns =>
+      match fuel with
+      | S n => ex_subtype a b ns n
+      | 0 => None
+      end
+    | None => Some false
+    end
+  end.
+
+Fixpoint fa_ex_subtype (a b : type)(cfa : st_context)(fuel:nat) : option bool :=
+  match fuel with
+  | S n =>
+    match ex_sub_ex (fst (lookup_path a cfa)) b with
+    | true =>
+      match step_ctx a cfa with
+      | Some ns => fa_ex_subtype a b ns n
+      | None => Some true
+      end
+    | _ => Some false
+    end
+  | 0 => None
+  end.
+\end{verbatim}
+
+The functions \verb|ex_subtype| and \verb|fa_ex_subtype| are direct choice stack equivalents
+of the iterator-based \verb|exists_iter| and \verb|forall_exists_iter|. This then leads to
+a correctness theorem for the choice stack versions.
+
+\begin{lemma}[Correctness of existential subtype checking with choice stacks]
+\begin{verbatim}
+forall a b it, (exists pf, exists_iter_inner a b it = inleft pf) <->
+   exists n, ex_subtype a b (iterator_to_path b it) n = Some true.
+\end{verbatim}
+For every two types \verb|a| and \verb|b|, the iterator-based algorithm
+\verb|exists_iter_inner| will produce a proof that \verb|a| is a subtype
+of \verb|b| if and only if there is an integer \verb|n| such that
+ \verb|ex_subtype| given \verb|n| fuel runs producing true.
+\end{lemma}
+\begin{proof}
+See \verb|ex_sub_corr_eq| in the Coq proof.
+\end{proof}
+
+\begin{lemma}[Correctness of forall-exists subtype checking with choice stacks]
+\begin{verbatim}
+forall a b it,
+    (exists pf, forall_iter_inner a b it = left pf) <->
+    exists n, fa_ex_subtype a b (iterator_to_path a it) n = Some true.
+\end{verbatim}
+For every two types \verb|a| and \verb|b|, the iterator-based algorithm
+\verb|forall_iter_inner| will produce a proof that \verb|a| is a subtype
+of \verb|b| if and only if there is an integer \verb|n| such that
+ \verb|fa_ex_subtype| given \verb|n| fuel runs producing true.
+\end{lemma}
+\begin{proof}
+See \verb|fa_sub_corr_eq| in the Coq proof.
+\end{proof}
+
+The choice stack-based algorithm produces the same results as the 
+iterator-based algorithm. 
 
 \end{document}
