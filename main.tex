@@ -75,6 +75,38 @@ respect to a semantic notion of subtyping using a proof assistant. Finally, we e
 the algorithm's use in the Julia programming language.
 \end{abstract}
 
+\section{FZN Introduction}
+%%% Please do not edit from here...
+
+Subtyping union types has been known for a long time.  Recall the rules.
+
+If we add covariant tuples, again, distributivity has been known for a
+long time.  Show the problem with standard rules.
+
+The standard solution is to rewrite types in normal form.  Explain
+normal form.
+
+This has two inconvenients:
+\begin{itemize}
+\item Space explosion.
+
+  \item Lack of completeness in presence of more expressive types,
+    eg.\ existential (explain Julia counterexample).
+\end{itemize}
+
+While subtyping union types is inherently exponential in time, it does
+not have to suffer from the above limitation wrt.\ space and
+expressiveness.
+
+In this paper we describe how the algorithm used by the Julia language to
+decide subtype solves subtyping union types and tuples.  We prove in
+Coq that the alogrithm is correct and complete with respect to a standard
+semantics subtyping model.  
+
+%%% ...to here
+%%% END FZN Introduction
+
+
 \section{Introduction}
 
 Deciding subtyping relationships between types in complex type systems is  a
