@@ -1,0 +1,12 @@
+digraph G {
+    margin=0;bgcolor="transparent";
+  union [label="Union", xlabel="L",color=lightblue,style=filled]
+  tuple1 [label="Tuple",color=lightblue,style=filled]
+  tuple2 [label="Tuple"]
+  A [label="A",color=lightblue,style=filled]
+  B [label="B"]
+  union -> tuple1
+  union -> tuple2
+  tuple1 -> A
+  tuple2 -> B
+}

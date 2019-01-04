@@ -1,0 +1,10 @@
+digraph G {
+    margin=0;bgcolor="transparent";
+  tuple [label="Tuple",color=lightblue,style=filled]
+  union1 [label="Union", xlabel="R",color=lightblue,style=filled]
+  A [label="A"]
+  B [label="B",color=lightblue,style=filled]
+  tuple -> union1
+  union1 -> A
+  union1 -> B
+}
