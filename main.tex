@@ -166,38 +166,12 @@ of its semantics.
 
 \section{Algorithm}
 
-\begin{figure}
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-		& \goodcell $\tupleo{A} <: \tupleo{A}$ \\
-\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-		& \badcell $\tupleo{A} \not<: \tupleo{B}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-		& \badcell $\tupleo{B} \not<: \tupleo{A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-		& \goodcell $\tupleo{B} <: \tupleo{B}$ \\
-\hline
-\end{tabular}
-
-\hspace{1em}
-
-$\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
-
-\caption{Checking for Subtype}
-\label{fig:cfs}
-\end{figure}
-
 Our algorithm for deciding subtyping for the type language
 runs in exponential time but constant space. In general, it
 works by iterating through every possible choice that could
 be made between branches of unions within a type and incrementally
 checking that the requisite guarantees hold at each type.
+\hspace{1em}
 
 \begin{minipage}{\textwidth}
 \begin{minipage}{0.4\textwidth}
@@ -223,7 +197,9 @@ let rec initial_choice (a:typ) =
 \end{verbatim}
 \end{minipage}
 \end{minipage}
+\hspace{1em}
 
+\noindent
 The key construct for our algorithm is the \verb|st_choice| operation,
 which represents whether the algorithm takes the left or the right branch
 of a union. At each iteration, the algorithm maintains a pair of lists of
@@ -264,7 +240,9 @@ of the choice list with Left choices, giving a valid state. If no successor stat
 found - if there are no Left choices that remain - then the function will return None.
 
 With a way to come up with an initial state and a way to step states, we can define
-a function that computes subtyping. 
+the \verb|subtype| function, which uses the helpers \verb|fa_ex_subtype| and \verb|ex_subtype| 
+to check that for every instantiation of the left-hand-side, there exists an instantiation of
+the right-hand-side such that \verb|base_subtype| holds.
 
 \begin{verbatim}
 type st_res =
@@ -300,8 +278,42 @@ let rec fa_ex_subtype (a:typ) (b:typ) (cfa:st_choice list) =
   | false -> false
 
 let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
-
 \end{verbatim}
+
+
+
+\begin{figure}
+\center
+\begin{tabular}{cc|cc|c}
+\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
+\hline
+$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
+\hline
+\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
+		& \goodcell $\tupleo{A} <: \tupleo{A}$ \\
+\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+		& \badcell $\tupleo{A} \not<: \tupleo{B}$ \\
+\hline
+\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
+		& \badcell $\tupleo{B} \not<: \tupleo{A}$ \\
+\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+		& \goodcell $\tupleo{B} <: \tupleo{B}$ \\
+\hline
+\end{tabular}
+
+\hspace{1em}
+
+$\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
+
+\caption{Checking for Subtype}
+\label{fig:cfs}
+\end{figure}
+
+Figure~\ref{fig:cfs} shows the execution of this function when checking the
+relation $\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$. For each
+instantiation of the $\forall$ choice stack, there needs to be an
+instantiation  of the $\exists$ stack such that when the type is subsetted
+using those stacks the subtype relation holds.
 
 \section{Unions and Tuples}
 
