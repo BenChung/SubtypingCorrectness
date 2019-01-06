@@ -226,27 +226,46 @@ let rec next_state (a:typ) (ls:st_choice list) =
   option_map fst (option_map (extend_list a) (last_left_to_right [] None ls))
 \end{verbatim}
 
-Next, we need some way to take one list of choices inside a type and
-step it forward to the next set of choices. We cannot simply treat the
-list as a binary number, as by taking a different branch we need to make
-a new set of choices for that branch. As a result, we break down the step
-operation into two separate steps.
+Next, we need some way to take one list of choices inside a type and step it
+forward to the next set of choices. We cannot simply treat the list as a
+binary number, as each branch can require a different number of choices to
+reach a leaf node. As a result, we break down the step operation into two
+separate steps.
+
+\begin{figure}
+\begin{tabular}{cccc}
+& \hspace{2.7em} & &\\
+\includegraphics[scale=0.6]{figures-gen/example1.pdf} &
+\multicolumn{2}{c}{\includegraphics[scale=0.6]{figures-gen/example2.pdf}} &
+\includegraphics[scale=0.6]{figures-gen/example3.pdf} \\
+L & \multicolumn{2}{c}{R} & RL \\
+\multicolumn{2}{c}{last\_left\_to\_right} & \multicolumn{2}{c}{extend\_list} \\
+\hline
+\multicolumn{4}{c}{next\_state} \\
+\end{tabular}
+\caption{State-stepping operation for choice lists}
+\label{fig:sstep}
+\end{figure}
 
 The first step for the iteration function is \verb|last_left_to_right|. This
-function finds the final Left instance in a list of choices, converts it to
+function finds the final Left instance in a list of choices and converts it to
 a Right instance appended to the rest of the list unmodified. This has us take
-the deepest alternative branch. \verb|extend_list| then initializes the remainder
-of the choice list with Left choices, giving a valid state. If no successor state is 
-found - if there are no Left choices that remain - then the function will return None.
+the deepest alternative branch, but that branch might have leftover unions
+that we need to pick choices for. \verb|extend_list| then finds where the new
+choice list runs out and fills it out to be valid with respect to the type
+giving a valid state. If no successor state is found---if there are no Left
+choices that remain---then the function will return None.
 
-With a way to come up with an initial state and a way to step states, we can define
-the \verb|subtype| function, which uses the helpers \verb|fa_ex_subtype| and \verb|ex_subtype| 
-to check that for every instantiation of the left-hand-side, there exists an instantiation of
-the right-hand-side such that \verb|base_subtype| holds.
+An example of a single step on the type $\union{A}{\union{B}{C}}$ is shown in
+figure~\ref{fig:sstep}. Starting from the initial choice---simply picking the
+left node---\verb|last_left_to_right| turns the left choice into a right choice.
+This path is invalid for this type, however, so \verb|extend_list| is needed to
+initialize the remainder of the path to make it valid. To do so, it picks the 
+left choice at the terminal union, producing a valid path.
 
 \begin{verbatim}
 type st_res =
-  | Subtype of st_choice list * st_choice list * var_env
+  | Subtype of st_choice list * st_choice list
   | NotSubtype
 
 let rec base_subtype (a:typ) (b:typ) (fa:st_choice list) (ex : st_choice list)
@@ -257,11 +276,21 @@ let rec base_subtype (a:typ) (b:typ) (fa:st_choice list) (ex : st_choice list)
      (match base_subtype ta1 tb1 fa ex with
       | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
       | NotSubtype -> NotSubtype)
-  | (Union(a1,a2),b,Left::fa,ex) -> base_subtype a1 b fa ex
-  | (Union(a1,a2),b,Right::fa,ex) -> base_subtype a2 b fa ex
-  | (a,Union(b1,b2),fa,Left::ex) -> base_subtype a b1 fa ex
-  | (a,Union(b1,b2),fa,Right::ex) -> base_subtype a b2 fa ex
+  | (Union(a1,a2),b,choice::fa,ex) -> 
+  		base_subtype (match choice with Left -> a1 | Right -> a2) b fa ex
+  | (a,Union(b1,b2),fa,choice::ex) -> 
+  		base_subtype a (match choice with Left -> b1 | Right -> b2) fa ex
+\end{verbatim}
 
+\verb|base_subtype| is responsible for using two paths---one for the left and
+right hand sides of the subtyping relation---and checking that the subtype
+relation holds with respect to those paths. Given a basic type---an atom or a
+tuple---it will either check equality or recur respectively. Given a union, it
+will grab the choice to make at that union off of the choice stacks and continue
+recursively. The function then returns an instance of \verb|st_res|, which
+gives the remaining choice stacks if successful or nothing otherwise.
+
+\begin{verbatim}
 let rec ex_subtype (a:typ) (b:typ) (fa:st_choice list) (cex : st_choice list) =
   match base_subtype a b fa cex with
   | Subtype(_,_) -> true
@@ -280,7 +309,12 @@ let rec fa_ex_subtype (a:typ) (b:typ) (cfa:st_choice list) =
 let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
 \end{verbatim}
 
-
+Subtyping types with distributive unions then reduces to iterating through
+every combination of the two iterators for a given relation. \verb|subtype|
+calls \verb|fa_ex_subtype|, which iterates through the left-hand-side's
+iterator while ensuring that \verb|ex_subtype| (or exists-subtype) holds at
+each step. \verb|ex_subtype| then finds if there is an instantiation of the
+right-hand-side iterator where \verb|base_subtype| holds.
 
 \begin{figure}
 \center

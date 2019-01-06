@@ -1,0 +1,14 @@
+digraph G {
+    margin=0;
+  uniont [label="Union", xlabel="L",color=lightblue,style=filled]
+  unionr [label="Union"]
+  A [label="A",color=lightblue,style=filled]
+  B [label="B"]
+  C [label="C"] 
+  uniont -> A
+  uniont -> unionr
+  unionr -> B
+  unionr -> C
+  A -> unionr[style=invis];
+  {rank=same; unionr A}
+}
