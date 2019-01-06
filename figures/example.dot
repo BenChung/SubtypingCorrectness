@@ -2,18 +2,20 @@ digraph G {
     margin=0;
   unionl [label="Union", xlabel="L",color=lightblue,style=filled]
   unionr [label="Union", xlabel="L",color=lightblue,style=filled]
-  unionrl [label="Union", xlabel="R",color=lightblue,style=filled]
+  unionrl [label="Union"]
   A1 [label="A",color=lightblue,style=filled]
-  A2 [label="A"]
+  A2 [label="A",color=lightblue,style=filled]
   B1 [label="B"]
-  B2 [label="B",color=lightblue,style=filled]
+  B2 [label="B"]
   "Tuple" [color=lightblue,style=filled]
   "Tuple" -> unionl
   "Tuple" -> unionr  
-  unionr -> unionrl
   unionl -> A1
   unionl -> B1
-  unionrl -> A2
   unionrl -> B2
-  unionr -> C
+  unionrl -> C
+  unionr -> unionrl
+  unionr -> A2
+  A2 -> unionrl[style=invis];
+  {rank=same; unionrl A2}
 }
