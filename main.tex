@@ -164,13 +164,34 @@ of its semantics.
 
 \section{Prior Work}
 
+Previous efforts to provide a decision procedure for distributive unions rely
+heavily on normalization. In order to decide subtyping in one of these
+approaches, the type is first normalized (to integrate the distributivity
+axiom) and then the standard syntax-directed subtyping algorithm is applied to
+conclude the subtyping
+relation~\cite{muehlboeck2018empowering,Reynolds1997,Pierce1991}. This
+normalization step puts the type into disjunctive normal form thereby allowing
+the algorithmic union rule to decide subtyping correctly. As there are
+exponentially many choice sets for any given type (where one of two choices
+may be given at each union), the space taken up by the fully normalized type
+can be substantial. Moreover, (in languages with some kind of higher-rank
+polymorphism) the normalization process eliminates all internal unions; as a
+concequence, variable instantiations may be over-specialized and some
+semantically-valid subtyping relations may not hold.
+
+
+
 \section{Algorithm}
 
 Our algorithm for deciding subtyping for the type language
 runs in exponential time but constant space. In general, it
 works by iterating through every possible choice that could
 be made between branches of unions within a type and incrementally
-checking that the requisite guarantees hold at each type.
+checking that the requisite guarantees hold at each type. In 
+this section, we will describe the implementation of the algorithm
+in OCaml. In the following section, we will then discuss the Coq
+version of the same algorithm.
+
 \hspace{1em}
 
 \begin{minipage}{\textwidth}
@@ -938,5 +959,7 @@ See \verb|fa_sub_corr_eq| in the Coq proof.
 The choice stack-based algorithm produces the same results as the 
 iterator-based algorithm. 
 
+\bibliographystyle{plain}
+\bibliography{refs}
 
 \end{document}
