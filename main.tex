@@ -120,48 +120,6 @@ semantics subtyping model.
 %%% ...to here
 %%% END FZN Introduction
 
-
-\section{Introduction}
-
-Deciding subtyping relationships between types in complex type systems is  a
-challenging problem. Despite the near-ubiquity of subtyping (or analogous
-relation)  in practical programming languages, subtyping is a notoriously
-difficult property to  establish for many type languages; in particular when
-semantic subtyping is desired or in the presence of type variables.
-
-The classic result in subtyping with variables is a good illustration of this
-difficulty. System $F_{<:}$, system F extended with subtyping and variable
-bounds, was long thought to be decidable. However, Pierce (1993, CITEME)
-reduced turing machines to System $F_{<:}$ terms, demonstrating that it is
-fully undecidable whether one system $F_{<:}$ type is a subtype of another.
-
-Since this result, much type system design effort has been spent on avoiding
-this precise issue. In spite of --- or perhaps as indicated by --- this
-effort, however, decision  procedures for subtyping are still relatively
-uncommon and complex.
-
-Of particular note is semantic subtyping, which defines the subtyping
-relationship as existing when the set of values denoted by one type is a
-subset of the other. When combined with unions and type variables, the
-sets of values denoted by particular types can become very difficult to compute
-and compare, leading to substantial complexity (Sam TH paper).
-
-Prior approaches to computing subtyping relationships with unions and other
-types have substantial issues. Prior approaches are able to handle the
-combination of unions and tuples (cite), but do so using normalization. As a
-result, they require memory exponential in the number of unions, leading to
-poor performance. Additionally, when type variables are added to the language,
-it becomes impossible to normalize terms while retaining all possibilities and
-therefore prior work is incomplete.
-
-In this paper, we present an algorithm for deciding subtyping between types
-that contain tuples, semantic unions, and existential type variables and
-describe its operation. We also provide and describe a proof of correctness of
-the core of this algorithm using both semantic and efficient internal state
-representations. Finally, we describe its use in the Julia programming
-language, which uses this algorithm to decide subtyping relationships as part
-of its semantics.
-
 \section{Prior Work}
 
 Previous efforts to provide a decision procedure for distributive unions rely
@@ -183,14 +141,12 @@ semantically-valid subtyping relations may not hold.
 
 \section{Algorithm}
 
-Our algorithm for deciding subtyping for the type language
-runs in exponential time but constant space. In general, it
-works by iterating through every possible choice that could
-be made between branches of unions within a type and incrementally
-checking that the requisite guarantees hold at each type. In 
-this section, we will describe the implementation of the algorithm
-in OCaml. In the following section, we will then discuss the Coq
-version of the same algorithm.
+Our algorithm for deciding subtyping works by iterating through every possible
+choice that could be made between branches of unions within a type and
+incrementally checking that the requisite guarantees hold at each type. In
+this section, we will describe the implementation of the algorithm in OCaml.
+In the following section, we will then discuss the Coq version of the same
+algorithm.
 
 \hspace{1em}
 
