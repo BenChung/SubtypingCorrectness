@@ -1,0 +1,6 @@
+
+*.aux
+*.log
+main.out
+main.vtc
+main.pdf
