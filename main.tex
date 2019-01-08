@@ -98,9 +98,14 @@ the algorithm's use in the Julia programming language.
 \section{FZN Introduction}
 %%% Please do not edit from here...
 
-Union types are playing an increasing role in mainstream languages.  In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{}, they are exposed at the source level, in others, as Hack~\cite{}, they are only used internally when performing type inference; in all cases they play a key role in the expressiveness of the language.
+Union types are playing an increasing role in mainstream languages.
+In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{},
+they are exposed at the source level, in others, as Hack~\cite{}, they
+are only used internally when performing type inference; in all cases
+they play a key role in the expressiveness of the language.
 
-Rules for subtyping union types have been known for a long time, and following Vouillon~\cite{Vouillon04} they may be written as:
+Rules for subtyping union types have been known for a long time, and
+following Vouillon~\cite{Vouillon04} they may be written as:
 \begin{mathpar}
 \inferrule{t_1 \sub t \\ t_2 \sub t}{\union{t_1}{t_2} \sub t}
 
@@ -110,8 +115,11 @@ Rules for subtyping union types have been known for a long time, and following V
 
 \inferrule{t \sub t_2}{t \sub \union{t_1}{t_2}}
 \end{mathpar}
-It has also been know for a long time that, in presence of covariant tuples, the above rules are not complete with respect a semantic subtyping model~\cite{}.  
- The standard example is to prove that covariant types are \emph{distributive} with respect to unions, that is that the following derivation holds:
+It has also been know for a long time that, in presence of covariant
+tuples, the above rules are not complete with respect a semantic
+subtyping model~\cite{}.  The standard example is to prove that
+covariant types are \emph{distributive} with respect to unions, that
+is that the following derivation holds:
 \[
 \tuple{\union{t_1}{t_2}, t} \ \ \sub\ \ \union{\tuple{t_1, t}}{\tuple{t_2, t}} 
 \]
@@ -119,23 +127,68 @@ If we recall the subtype rule for covariant tuples:
 \[
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \]
-then it is evident that the rule for tuple types does not apply, and derivations must immediately pick either the left or right component of the union type, and none allows to conclude.  The standard approach to solve this condrundum is to rewrite all types into their disjunctive normal form, that is, as unions of intersections of literals, \emph{before} building the derivation.  The rewriting step can be implemented easily and its correctness can be justified by a semantic-subtyping denotational model, as in~\cite{Frisch08}, and the resulting subtype algorithm can be proved correct and complete. However, the standard algorithm based on ahead-of-time normalisation has \emph{two major drawbacks}.  The first drawback is that the normalisation phase rewrites types into potentially \emph{exponentially bigger} types.  In practice, the Julia runtime must routinely solve queries involving \textbf{EXACT NUMBER FROM LOGS - find again the nice example where normalisation kills but Julia flies}; normalising these types before deciding subtyping is not an option.
- %: while subtyping union types is inherently exponential in time, it does not have to be \emph{exponential in space}.  
+then it is evident that the rule for tuple types does not apply, and
+derivations must immediately pick either the left or right component
+of the union type, and none allows to conclude.  The standard approach
+to solve this condrundum is to rewrite all types into their
+disjunctive normal form, that is, as unions of union-free types,
+\emph{before} building the derivation.  The rewriting step can be
+implemented easily and its correctness can be justified by a
+semantic-subtyping denotational model, as in~\cite{Frisch08}, and the
+resulting subtype algorithm can be proved correct and
+complete. However, the standard algorithm based on ahead-of-time
+normalisation has \emph{two major drawbacks}.  The first drawback is
+that the normalisation phase rewrites types into potentially
+\emph{exponentially bigger} types.  In practice, the Julia runtime
+must routinely solve queries involving\textbf{EXACT NUMBER FROM LOGS -
+  find again the nice example where normalisation kills but Julia has
+  no problem because all components are matched against Any};
+normalising these types before deciding subtyping is not an option.
 
-The other problem is that the ahead-of-time normalisation phase does not interact nicely with other type system features.  If we add invariant constructors for instance, then it is unsound to lift all union types at top level, because \(\arrayt{\union{t_1}{t_2}}\)  \emph{is not}  a subtype of \(\union{\arrayt{t_1}} {\arrayt{t_2}}\), XXX
 
+The other problem is that the ahead-of-time normalisation phase does
+not interact nicely with other type system features.  Invariant
+constructors make unsound lifting all union types at top level: the
+type \(\arrayt{\union{t_1}{t_2}}\) denotes the set of array whose
+elements are either of type \(t_1\) or \(t_2\), and it is incorrect to
+rewrite it as \(\union{\arrayt{t_1}} {\arrayt{t_2}}\) which denotes
+the set of arrays whose elements are either all of type \(t_1\) or all
+of type \(t_2\).  It might be argued that this can be easily
+circumvented by a weaker normal form, that only lifts union types
+inside each invariant constructor, but this only reveals a deeper
+problem in presence of both invariant constructors and existential
+types.
+%\textbf{would be good to have one example of a language that
+%    has both here}.
+In this case, the judgment below should hold:
+\[
+  \arrayt{\union{\tuple{t_1}}{\tuple{t_2}}} \ \ <:\ \ \exists T\,.\, \arrayt{\tuple{T}}
+\]
+All types are in normal form, and a standard algorithm would initially
+perform the left-to-right subtype check due to the outer invariant
+constructor and generates the constraint \(T\ >:\ \union{t_1}{t_2}\).
+As a consequence the right-to-left check
+\(\tuple{T}\ \ <:\ \ \union{\tuple{t_1}\tuple{t_2}}\)  gets stuck trying
+to prove \(T\ <:\ t_1\) or \(T\ <:\ t_2\).  The key to derive a
+succesfull judgement here is to rewrite the  right-to-left check into
+\(\tuple{T}\ \ <:\ \ \tuple{\union{t_1}{t_2}}\), which is provable.
+This is a sort of \emph{anti-normalisation} rewriting, that must be
+performed on sub-judgments of the derivation.
 
-More interestingly, if we extend the language with existential types and invariant constructors, then :
+To the best of our knowledge, Julia subtype algorithm is the only
+known subtype algorithm that can correctly prove this last judgement.
+Julia subtype algorithm does not rely on normalisation, but rather
+implements an effective search across union types using two explicit stacks.
 
-  Ref{Union{Tuple{Int}, Tuple{Bool}}} <: Ref{Tuple{T}} where T
-
-
-While subtying union types in presence of covariant types is inherently exponential in time in the worst case, it is 
-
-In this paper we describe how the algorithm used by the Julia language to
-decide subtype solves subtyping union types and tuples, providing evidence that it does not suffer from the two drawbacks above.  We prove in
-Coq that the alogrithm is correct and complete with respect to a standard
-semantics subtyping model.  
+In this ``pearl'' paper we describe how the clever algorithm used by
+the Julia language to decide subtype computes subtyping in a core
+language with only union types, covariant tuples, and literals, and we
+will provide evidence that it does not suffer from the two drawbacks
+above.  Our goal is to make this technique known to a wider audience,
+as we expect that it lifts smoothly to other richer type systems as it
+lifts smoothly to the full Julia type system.  Additionally we prove
+in Coq that the algorithm is correct and complete with respect to a
+standard semantics subtyping model.
 
 
 
