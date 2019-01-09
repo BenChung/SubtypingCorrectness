@@ -30,9 +30,9 @@
 
 \bibliographystyle{plainurl}% the recommnded bibstyle
 
-\title{Subtyping Correctness - Temporary Title}
+\title{On Julia's efficient algorithm for subtyping union types and covariant tuples}
 
-\titlerunning{Temporary Title}%optional, please use if title is longer than one line
+%\titlerunning{Temporary Title}%optional, please use if title is longer than one line
 
 \author{Benjamin Chung}{Northeastern University}{bchung@ccs.neu.edu}{}{}%mandatory, please use full name; only 1 author per \author macro; first two parameters are mandatory, other parameters can be empty.
 
@@ -46,7 +46,7 @@
 
 \subjclass{Dummy classification}% mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
 
-\keywords{Dummy keyword}%mandatory
+\keywords{Type systems, Subtyping, Union types}
 
 \category{}%optional, e.g. invited paper
 
@@ -88,11 +88,23 @@
 
 \maketitle
 \begin{abstract}
-We describe a novel algorithm for deciding subtyping for a type language consisting
-of tuples, unions, and existential type variables without normalization and requiring
-space linear in the size of the input types. We prove algorithmic correctness with 
-respect to a semantic notion of subtyping using a proof assistant. Finally, we examine
-the algorithm's use in the Julia programming language.
+  We describe the clever algorithm implemented in the Julia
+  programming language runtime to decide subtype on a simple type
+  system with union types, covariant tuples, and literals.  This
+  algorithm is immune from the space-explosion and expressiveness
+  problems of the standard algorithms based on normalising types in
+  disjuntcive normal form ahead-of-time.  We additionally prove it
+  correct and complete against a semantic-subtyping denotational model
+  in Coq.
+%%   Deciding subtype on Union types and covariant tuples present several
+
+%%   We present the clever algorithm implemented in the Julia programming
+%%   language to decide subtype on a core 
+%% We describe a novel algorithm for deciding subtyping for a type language consisting
+%% of tuples, unions, and existential type variables without normalization and requiring
+%% space linear in the size of the input types. We prove algorithmic correctness with 
+%% respect to a semantic notion of subtyping using a proof assistant. Finally, we examine
+%% the algorithm's use in the Julia programming language.
 \end{abstract}
 
 \section{FZN Introduction}
@@ -180,7 +192,7 @@ known subtype algorithm that can correctly prove this last judgement.
 Julia subtype algorithm does not rely on normalisation, but rather
 implements an effective search across union types using two explicit stacks.
 
-In this ``pearl'' paper we describe how the clever algorithm used by
+In this \emph{pearl paper} we describe how the clever algorithm used by
 the Julia language to decide subtype computes subtyping in a core
 language with only union types, covariant tuples, and literals, and we
 will provide evidence that it does not suffer from the two drawbacks
