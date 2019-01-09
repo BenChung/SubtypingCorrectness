@@ -151,11 +151,30 @@ resulting subtype algorithm can be proved correct and
 complete. However, the standard algorithm based on ahead-of-time
 normalisation has \emph{two major drawbacks}.  The first drawback is
 that the normalisation phase rewrites types into potentially
-\emph{exponentially bigger} types.  In practice, the Julia runtime
-must routinely solve queries involving\textbf{EXACT NUMBER FROM LOGS -
-  find again the nice example where normalisation kills but Julia has
-  no problem because all components are matched against Any};
-normalising these types before deciding subtyping is not an option.
+\emph{exponentially bigger} types.  In practice, logging and analysing
+the calls to Julia runtime subtype algorithm, we often observe queries
+involving types as the one below:
+\begin{small}
+\begin{verbatim}
+   Tuple{Tuple{Union{Int64, Bool}, Union{String, Bool}, Union{String, Bool}, 
+               Union{String, Bool}, Union{Int64, Bool}, Union{String, Bool}, 
+               Union{String, Bool}, Union{String, Bool}, Union{String, Bool}, 
+               Union{String, Bool}, Union{String, Bool}, Union{String, Bool}, 
+               Union{String, Bool}, Union{String, Bool}, Union{String, Bool}}, Int64}
+ \end{verbatim}
+\end{small}
+Normalising this type before attempting to decide subtyping is not a
+realistic option, and solving a query where it is matched against a
+type as 
+\begin{small}
+\begin{verbatim}
+Tuple{Tuple{Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any,
+            Any, Any, Any, Any}, Any}
+\end{verbatim}
+\end{small}
+(where \verb+Any+ is the supertype of all types) ought to be performed in
+linear time.
+
 
 
 The other problem is that the ahead-of-time normalisation phase does
@@ -178,10 +197,10 @@ In this case, the judgment below should hold:
 \]
 All types are in normal form, and a standard algorithm would initially
 perform the left-to-right subtype check due to the outer invariant
-constructor and generates the constraint \(T\ >:\ \union{t_1}{t_2}\).
+constructor and generates the constraint \(T >: \union{t_1}{t_2}\).
 As a consequence the right-to-left check
-\(\tuple{T}\ \ <:\ \ \union{\tuple{t_1}\tuple{t_2}}\)  gets stuck trying
-to prove \(T\ <:\ t_1\) or \(T\ <:\ t_2\).  The key to derive a
+\(\tuple{T} \ <:\ \union{\tuple{t_1}\tuple{t_2}}\)  gets stuck trying
+to prove \(T <: t_1\) or \(T <: t_2\).  The key to derive a
 succesfull judgement here is to rewrite the  right-to-left check into
 \(\tuple{T}\ \ <:\ \ \tuple{\union{t_1}{t_2}}\), which is provable.
 This is a sort of \emph{anti-normalisation} rewriting, that must be
