@@ -110,9 +110,9 @@
 \section{FZN Introduction}
 %%% Please do not edit from here...
 
-Union types are playing an increasing role in mainstream languages.
+Union types are increasingly common in mainstream languages.
 In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{},
-they are exposed at the source level, in others, as Hack~\cite{}, they
+they are exposed at the source level. In others, as Hack~\cite{}, they
 are only used internally when performing type inference; in all cases
 they play a key role in the expressiveness of the language.
 
@@ -127,32 +127,32 @@ following Vouillon~\cite{Vouillon04} they may be written as:
 
 \inferrule{t \sub t_2}{t \sub \union{t_1}{t_2}}
 \end{mathpar}
-It has also been know for a long time that, in presence of covariant
-tuples, the above rules are not complete with respect a semantic
-subtyping model~\cite{}.  The standard example is to prove that
-covariant types are \emph{distributive} with respect to unions, that
-is that the following derivation holds:
+It has also been known for a long time that, in presence of covariant
+tuples, the above rules are not complete with respect to a semantic
+subtyping model~\cite{}. In such a semantic model, covariant types
+should be \emph{distributive} with respect to unions; under a distributive
+system, the following derivation should hold:
 \[
 \tuple{\union{t_1}{t_2}, t} \ \ \sub\ \ \union{\tuple{t_1, t}}{\tuple{t_2, t}} 
 \]
-If we recall the subtype rule for covariant tuples:
+Recall the subtype rule for covariant tuples:
 \[
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \]
-then it is evident that the rule for tuple types does not apply, and
-derivations must immediately pick either the left or right component
-of the union type, and none allows to conclude.  The standard approach
-to solve this condrundum is to rewrite all types into their
-disjunctive normal form, that is, as unions of union-free types,
-\emph{before} building the derivation.  The rewriting step can be
+With this rule, derivations must immediately pick either the left or
+right component of the union type; as a result, it is impossible to 
+conclude the above subtyping relation. The standard approach
+to solve this conundrum is to rewrite all types into their
+disjunctive normal form (DNF, unions of union-free types)
+\emph{before} building the derivation. This rewriting step can be
 implemented easily and its correctness can be justified by a
-semantic-subtyping denotational model, as in~\cite{Frisch08}, and the
+semantic-subtyping denotational model, as in~\cite{Frisch08}. Moreover, the
 resulting subtype algorithm can be proved correct and
 complete. However, the standard algorithm based on ahead-of-time
-normalisation has \emph{two major drawbacks}.  The first drawback is
-that the normalisation phase rewrites types into potentially
-\emph{exponentially bigger} types.  In practice, logging and analysing
-the calls to Julia runtime subtype algorithm, we often observe queries
+normalization has \emph{two major drawbacks}.  The first drawback is
+that the normalization phase rewrites types into potentially
+\emph{exponentially bigger} types. By instrumenting Julia's 
+subtyping decision procedure when executing library code, we often observe queries
 involving types as the one below:
 \begin{small}
 \begin{verbatim}
@@ -163,7 +163,8 @@ involving types as the one below:
                Union{String, Bool}, Union{String, Bool}, Union{String, Bool}}, Int64}
  \end{verbatim}
 \end{small}
-Normalising this type before attempting to decide subtyping is not a
+
+Normalizing this type before attempting to decide subtyping is not a
 realistic option, and solving a query where it is matched against a
 type as 
 \begin{small}
@@ -175,41 +176,35 @@ Tuple{Tuple{Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any,
 (where \verb+Any+ is the supertype of all types) ought to be performed in
 linear time.
 
-
-
-The other problem is that the ahead-of-time normalisation phase does
-not interact nicely with other type system features.  Invariant
-constructors make unsound lifting all union types at top level: the
-type \(\arrayt{\union{t_1}{t_2}}\) denotes the set of array whose
-elements are either of type \(t_1\) or \(t_2\), and it is incorrect to
-rewrite it as \(\union{\arrayt{t_1}} {\arrayt{t_2}}\) which denotes
-the set of arrays whose elements are either all of type \(t_1\) or all
-of type \(t_2\).  It might be argued that this can be easily
-circumvented by a weaker normal form, that only lifts union types
-inside each invariant constructor, but this only reveals a deeper
-problem in presence of both invariant constructors and existential
+The second drawback of ahead-of-time normalisation phase is that it does
+not interact nicely with other type system features. Invariant
+constructors make lifting all union types to the top level unsound.
+Consider the type \(\arrayt{\union{t_1}{t_2}}\). It denotes the set 
+of arrays whose elements are either of type \(t_1\) or \(t_2\). It 
+would be incorrect to rewrite it as \(\union{\arrayt{t_1}} {\arrayt{t_2}}\), 
+as this latter type denotes the set of arrays whose elements are either 
+all of type \(t_1\) or all of type \(t_2\). A weaker normal form that
+only lifts union types inside each invariant constructor might be able
+to circumvent this problem, but this only reveals a deeper
+problem in the presence of both invariant constructors and existential
 types.
 %\textbf{would be good to have one example of a language that
 %    has both here}.
-In this case, the judgment below should hold:
+With such a weaker normal form, the judgment below should hold:
 \[
   \arrayt{\union{\tuple{t_1}}{\tuple{t_2}}} \ \ <:\ \ \exists T\,.\, \arrayt{\tuple{T}}
 \]
 All types are in normal form, and a standard algorithm would initially
 perform the left-to-right subtype check due to the outer invariant
-constructor and generates the constraint \(T >: \union{t_1}{t_2}\).
-As a consequence the right-to-left check
-\(\tuple{T} \ <:\ \union{\tuple{t_1}\tuple{t_2}}\)  gets stuck trying
-to prove \(T <: t_1\) or \(T <: t_2\).  The key to derive a
-succesfull judgement here is to rewrite the  right-to-left check into
-\(\tuple{T}\ \ <:\ \ \tuple{\union{t_1}{t_2}}\), which is provable.
-This is a sort of \emph{anti-normalisation} rewriting, that must be
-performed on sub-judgments of the derivation.
+constructor. In doing so, it would generate the constraint on $T$ \(T\ >:\ \union{t_1}{t_2}\).
+As a consequence, the subsequent right-to-left check
+\(\tuple{T}\ \ <:\ \ \union{\tuple{t_1}\tuple{t_2}}\) gets stuck when trying
+to prove \(T\ <:\ t_1\) or \(T\ <:\ t_2\). 
 
-To the best of our knowledge, Julia subtype algorithm is the only
-known subtype algorithm that can correctly prove this last judgement.
-Julia subtype algorithm does not rely on normalisation, but rather
-implements an effective search across union types using two explicit stacks.
+The key to derive a successful judgment for this relation is to rewrite the
+right-to-left check into \(\tuple{T}\ \ <:\ \ \tuple{\union{t_1}{t_2}}\),
+which is provable. This is a sort of \emph{anti-normalisation} rewriting, that
+must be performed on sub-judgments of the derivation.
 
 In this \emph{pearl paper} we describe how the clever algorithm used by
 the Julia language to decide subtype computes subtyping in a core
@@ -220,8 +215,6 @@ as we expect that it lifts smoothly to other richer type systems as it
 lifts smoothly to the full Julia type system.  Additionally we prove
 in Coq that the algorithm is correct and complete with respect to a
 standard semantics subtyping model.
-
-
 
 \newpage
 
@@ -270,15 +263,13 @@ semantically-valid subtyping relations may not hold.
 Our algorithm for deciding subtyping works by iterating through every possible
 choice that could be made between at branches of unions within the two types
 participating in a subtype check. In this section, we will describe the
-implementation of the algorithm in OCaml. In the following section, we will
-then discuss the Coq version of the same algorithm.
+implementation of the algorithm in OCaml and will present our proof of
+correctness in the following section.
 
 The type language for our algorithm is a subset of that used in the Julia
-programming language. We focus on the distributive property of unions over
-tuples. Notably, our type system does not include arrow types---Julia has none
----nor type variables. Additionally, so as to avoid needing an additional
-externally-provided subtype hierarchy, we specify that atomic types (atoms)
-are subtypes only if they are exactly the same.
+programming language, removing type variables. So as to avoid needing an
+additional externally-provided subtype hierarchy, we specify that atomic types
+(atoms) are subtypes only if they are exactly the same.
 
 \hspace{1em}
 
@@ -436,7 +427,7 @@ $\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
 
 $\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
 
-\caption{Checking for Subtype}
+\caption{Subtyping decision procedure example}
 \label{fig:cfs}
 \end{figure}
 
@@ -530,8 +521,7 @@ A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \deno
 \end{definition}
 
 Proving a subtyping algorithm sound and complete is therefore equivalent to
-producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} +
-{~NormalSubtype t1 t2}|; that is, is able to decide whether two types are
+producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; that is, is able to decide whether two types are
 subtypes or not.
 
 \subsection{Normalization}
