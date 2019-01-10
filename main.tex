@@ -1,10 +1,4 @@
-\documentclass[a4paper,english]{lipics-v2018}
-%This is a template for producing LIPIcs articles. 
-%See lipics-manual.pdf for further information.
-%for A4 paper format use option "a4paper", for US-letter use option "letterpaper"
-%for british hyphenation rules use option "UKenglish", for american hyphenation rules use option "USenglish",
-% for section-numbered lemmas etc., use "numberwithinsect"
-
+\documentclass[draft,a4paper,english]{lipics-v2018}
 \usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx}%if unwanted, comment out or use option "draft"
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
@@ -29,19 +23,19 @@
 
 \bibliographystyle{plainurl}% the recommnded bibstyle
 
-\title{On Julia's efficient algorithm for subtyping union types and covariant tuples}
+\title{On Julia's efficient algorithm for subtyping union types and covariant tuples (Pearl)}
 
 %\titlerunning{Temporary Title}%optional, please use if title is longer than one line
 
-\author{Benjamin Chung}{Northeastern University}{bchung@ccs.neu.edu}{}{}%mandatory, please use full name; only 1 author per \author macro; first two parameters are mandatory, other parameters can be empty.
+\author{Anon}{None}{}{}{}
 
-\author{Francesco Zappa Nardelli}{Inria}{}{}{}
+%\author{Benjamin Chung}{Northeastern University}{bchung@ccs.neu.edu}{}{}%mandato
+%\author{Francesco Zappa Nardelli}{Inria}{}{}{}
+%\author{Jan Vitek}{Northeastern University \& Czech Technical University}{}{}{}
 
-\author{Jan Vitek}{Northeastern University \& Czech Technical University}{}{}{}
+\authorrunning{Anon}%B. Chung, F. Zappa Nardelli, J. Vitek}%mandatory. First: Use abb
 
-\authorrunning{B. Chung, F. Zappa Nardelli, J. Vitek}%mandatory. First: Use abbreviated first/middle names. Second (only i,n severe cases): Use first author plus 'et al.'
-
-\Copyright{Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, please use full first names. LIPIcs license is "CC-BY";  http://creativecommons.org/licenses/by/3.0/
+\Copyright{Anon}%Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, plea
 
 \subjclass{Dummy classification}% mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
 
@@ -851,7 +845,7 @@ See \verb|fa_sub_corr_eq| in the Coq proof.
 The choice stack-based algorithm produces the same results as the 
 iterator-based algorithm. 
 
-\bibliographystyle{plain}
+%\bibliographystyle{plain}
 \bibliography{refs}
 
 \end{document}
