@@ -189,7 +189,7 @@ With such a weaker normal form, the judgment below should hold:
 \]
 All types are in normal form, and a standard algorithm would initially
 perform the left-to-right subtype check due to the outer invariant
-constructor. In doing so, it would generate the constraint on $T$ \(T\ >:\ \union{t_1}{t_2}\).
+constructor. In doing so, it would generate the constraint \(T\ >:\ \union{t_1}{t_2}\).
 As a consequence, the subsequent right-to-left check
 \(\tuple{T}\ \ <:\ \ \union{\tuple{t_1}\tuple{t_2}}\) gets stuck when trying
 to prove \(T\ <:\ t_1\) or \(T\ <:\ t_2\). 
