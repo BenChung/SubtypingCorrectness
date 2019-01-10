@@ -317,18 +317,37 @@ let rec initial_choice (a:typ) =
 \end{minipage}
 \hspace{1em}
 
-\noindent The key construct for our algorithm is the \verb|st_choice|
-operation, which represents whether the algorithm takes the left or the right
-branch of a union. The algorithm stores the choice made at each union at the
-present iteration in two stacks of \verb|st_choice|s, one for each side of the
-subtype relation. 
+\noindent An example execution of the subtyping decision procedure is shown in
+figure~\ref{fig:cfs}. Here, we are determining if $\tuple{\union{A}{B}} <:
+\union{\tuple{A}}{\tuple{B}}$. To check if the relation holds, the algorithm
+needs to ensure that for every instantiation on the left hand side that there
+is an instantiation of the right hand side such that the basic subtyping
+relation holds. In this case, the relation holds: no matter if we choose 
+$\tuple{A}$ or $\tuple{B}$ on the left hand side, we can always pick the
+same on the right hand side. Therefore, subtyping holds. The key challenge for
+a subtyping algorithm for this type language, then, is providing it with the ability
+to enumerate every possible instantiation of the left and right hand sides without
+needing to normalize.
 
-To move through all possible choices, the \verb|next_state| function steps a
-stack of \verb|st_choice|s to the next state. Here, we arbitrarily define next
-state as ``the deepest unexplored alternative,'' or, equivalently, where the
-last left has been converted to a right. We implement \verb|next_state| in two
-distinct helper functions, the first of which implements the last-left-to-
-right operation and the second implements a fix-up operation.
+To do this, we base our approach on iterators. The key construct for our
+algorithm is the \verb|st_choice| operation, which represents whether the
+algorithm takes the left or the right branch of a union. The algorithm stores
+the choice made at each union at the present iteration in two stacks of
+\verb|st_choice|s, one for each side of the subtype relation.
+
+A \verb|st_choice| stack can be seen as the state of an iterator that
+enumerates every union-type induced alternative in a given type. It is
+possible to define both an initial element and next state function for
+iterators defined using \verb|st_choice| stacks. In turn, it is possible
+to use \verb|st_choice| stacks to enumerate every possible choice that can
+be made at union types within a program.
+
+We choose the initial value for our iterators to be the state where, every
+time a union type is encountered in the structure of the type, the iterator
+takes the  leftmost choice (as implemented in \verb|initial_choice|). As the
+iterator continues through the possible choices, it will successively move
+right through the type until it reaches the state where at every  union type
+it encounters it takes the right-hand choice.
 
 \begin{figure}
 \begin{tabular}{cccc}
@@ -353,11 +372,20 @@ let rec last_left_to_right
   | [] -> option_map List.rev ll
 \end{verbatim}
 
-The first step for the iteration function is \verb|last_left_to_right|. This
-function finds the final Left instance in a list of choices and converts it to
-a Right instance appended to the rest of the list unmodified. The new path
-therefore points to the deepest as-yet unexplored path. However, its length
-may be insufficient to  make a choice at each reachable union.
+With a definition for the initial state, we can then define the iteration function.
+We break the iteration function, \verb|next_state| up into two helper functions. The
+operation of these helpers is illustrated in figure~\ref{fig:sstep}. Here, starting
+from the initial state (where the iterator takes the leftmost choice at the root of
+the type), \verb|last_left_to_right| converts the left choice into a right choice. However,
+because this is not yet a complete selection through the type, \verb|extend_list| is then
+used to appropriately pad out the type with left choices.
+
+\verb|last_left_to_right| performs the incremental stepping-to-the-right operation at
+state transitions. It finds the final left choice in a given choice stack, truncates the
+stack to that left choice, and then converts it to a right. For example, given the type 
+$\union{\union{A}{B}}{C}$ and the choice list LL, \verb|last_left_to_right| will 
+produce the choice list LR; if given LR, it will produce R (as the final left choice
+is at the top-level and it truncates the remainder of the choice list).
 
 \begin{verbatim}
 let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
@@ -371,22 +399,33 @@ let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
   | (Union(l,r), []) -> (Left::initial_choice l,[])
 \end{verbatim}
 
-\verb|extend_list| then finds where the new choice list runs out and fills it
-out to be valid with respect to the type giving a valid state. If no successor
-state is found---if there are no Left choices that remain---then the function
-will return None.
+On some types (such as that shown in figure~\ref{fig:sstep}), though, this
+truncation leaves a partial path. \verb|extend_list| finds where the new
+choice list runs out and fills it out to be valid with respect to the type
+giving a valid state. If no successor state is found---if there are no Left
+choices that remain---then the function will return None. In figure~\ref{fig:sstep},
+\verb|last_left_to_right| produced a partial path, as the right child of the root
+union is a union itself. \verb|extend_list| pads the list out to take the left choice
+at this child union, returning the path to validity.
 
 \begin{verbatim}
 let rec next_state (a:typ) (ls:st_choice list) =
   option_map fst (option_map (extend_list a) (last_left_to_right [] None ls))
 \end{verbatim}
 
-An example of a single step on the type $\union{A}{\union{B}{C}}$ is shown in
-figure~\ref{fig:sstep}. Starting from the initial choice---simply picking the
-left node---\verb|last_left_to_right| turns the left choice into a right choice.
-This path is invalid for this type, however, so \verb|extend_list| is needed to
-initialize the remainder of the path to make it valid. To do so, it picks the 
-left choice at the terminal union, producing a valid path.
+\verb|next_state| combines these operations into a single step operation. It
+will take the deepest alternative choice at a union using
+\verb|last_left_to_right|, then add however many left choices is required to
+make the path valid using \verb|extend_list|. 
+
+Now that we have defined the core iterator infrastructure, we can show how it
+is used to decide subtyping queries. The algorithm proceeds by maintaining two
+iterators (one for each side of the subtyping judgment) over choices-at-
+unions,  checking that for every instantiation of the left hand type there
+exists an instantiation of the right hand type. We will first define the
+fundamental subtyping relation, used to decide subtyping relationships when
+given instantiations of the left and right hand types, then describe the
+algorithm that iterates through those types.
 
 \begin{verbatim}
 type st_res =
