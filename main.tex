@@ -266,6 +266,33 @@ additional externally-provided subtype hierarchy, we specify that atomic types
 
 \hspace{1em}
 
+\begin{figure}
+\center
+\begin{tabular}{cc|cc|c}
+\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
+\hline
+$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
+\hline
+\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
+    & \goodcell ${A} <: {A}$ \\
+\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \badcell ${A} \not<: {B}$ \\
+\hline
+\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
+    & \badcell ${B} \not<: {A}$ \\
+\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \goodcell ${B} <: {B}$ \\
+\hline
+\end{tabular}
+
+\hspace{1em}
+
+$\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
+
+\caption{Subtyping decision procedure example}
+\label{fig:cfs}
+\end{figure}
+
 \begin{minipage}{\textwidth}
 \begin{minipage}{0.4\textwidth}
 \begin{verbatim}
@@ -395,34 +422,6 @@ tuple---it will either check equality or recur respectively. Given a union, it
 will grab the choice to make at that union off of the choice stacks and continue
 recursively. The function then returns an instance of \verb|st_res|, which
 gives the remaining choice stacks if successful or nothing otherwise.
-
-
-\begin{figure}
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-    & \goodcell $\tupleo{A} <: \tupleo{A}$ \\
-\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \badcell $\tupleo{A} \not<: \tupleo{B}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-    & \badcell $\tupleo{B} \not<: \tupleo{A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \goodcell $\tupleo{B} <: \tupleo{B}$ \\
-\hline
-\end{tabular}
-
-\hspace{1em}
-
-$\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
-
-\caption{Subtyping decision procedure example}
-\label{fig:cfs}
-\end{figure}
 
 
 Finally, to check subtyping, we need to iterate through both types in the 
