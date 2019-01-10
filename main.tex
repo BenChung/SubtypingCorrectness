@@ -1,4 +1,4 @@
-\documentclass[draft,a4paper,english]{lipics-v2018}
+\documentclass[a4paper,english]{lipics-v2018}
 \usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx}%if unwanted, comment out or use option "draft"
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
@@ -199,6 +199,21 @@ right-to-left check into \(\tuple{T}\ \ <:\ \ \tuple{\union{t_1}{t_2}}\),
 which is provable. This is a sort of \emph{anti-normalisation} rewriting, that
 must be performed on sub-judgments of the derivation.
 
+Previous efforts to provide a decision procedure for distributive unions rely
+heavily on normalization. In order to decide subtyping in one of these
+approaches, the type is first normalized (to integrate the distributivity
+axiom) and then the standard syntax-directed subtyping algorithm is applied to
+conclude the subtyping
+relation~\cite{muehlboeck2018empowering,Reynolds1997,Pierce1991}. This
+normalization step puts the type into disjunctive normal form thereby allowing
+the algorithmic union rule to decide subtyping correctly. As there are
+exponentially many choice sets for any given type (where one of two choices
+may be given at each union), the space taken up by the fully normalized type
+can be substantial. Moreover, (in languages with some kind of higher-rank
+polymorphism) the normalization process eliminates all internal unions; as a
+concequence, variable instantiations may be over-specialized and some
+semantically-valid subtyping relations may not hold.
+
 In this \emph{pearl paper} we describe how the clever algorithm used by
 the Julia language to decide subtype computes subtyping in a core
 language with only union types, covariant tuples, and literals, and we
@@ -231,23 +246,6 @@ standard semantics subtyping model.
 %expressiveness.
 %%% ...to here
 %%% END FZN Introduction    
-
-\section{Prior Work}
-
-Previous efforts to provide a decision procedure for distributive unions rely
-heavily on normalization. In order to decide subtyping in one of these
-approaches, the type is first normalized (to integrate the distributivity
-axiom) and then the standard syntax-directed subtyping algorithm is applied to
-conclude the subtyping
-relation~\cite{muehlboeck2018empowering,Reynolds1997,Pierce1991}. This
-normalization step puts the type into disjunctive normal form thereby allowing
-the algorithmic union rule to decide subtyping correctly. As there are
-exponentially many choice sets for any given type (where one of two choices
-may be given at each union), the space taken up by the fully normalized type
-can be substantial. Moreover, (in languages with some kind of higher-rank
-polymorphism) the normalization process eliminates all internal unions; as a
-concequence, variable instantiations may be over-specialized and some
-semantically-valid subtyping relations may not hold.
 
 
 
