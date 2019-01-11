@@ -2,8 +2,8 @@
 \usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx}%if unwanted, comment out or use option "draft"
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
-\newcommand{\tupleo}[1]{\xt{Tuple1\{}#1\xt{\}}}
-\newcommand{\tuplet}[2]{\xt{Tuple2\{}#1,#2\xt{\}}}
+%\newcommand{\tupleo}[1]{\xt{Tuple1\{}#1\xt{\}}}
+\newcommand{\tuplet}[2]{\xt{Tuple\{}#1,#2\xt{\}}}
 \newcommand{\union}[2]{\xt{Union\{}#1,#2\xt{\}}}
 \newcommand{\denotes}[1]{\llbracket #1 \rrbracket}
 
@@ -11,6 +11,7 @@
 \newcommand{\sub}{<:}
 \newcommand{\tuple}[1]{\xt{Tuple\{}#1\xt{\}}}
 \newcommand{\arrayt}[1]{\xt{Array\{}#1\xt{\}}}
+\newcommand{\FZ}[1]{\textbf{FZ says: #1}}
 %end FZ
 
 \newcommand{\bsub}{<:_b}
@@ -241,25 +242,6 @@ respect to a standard semantics subtyping model.
 
 \section{A space-efficient algorithm}
 
-The greatest difficulty of subtyping union types is to ensure that all of
-the search space due to the union types forall/exist quantifications
-is explored.  We have seen that the syntax-directed rules, if not
-coupled with an ahead-of-time normalisation phase, do not ensure
-completeness of the search in presence of covariant tuples.
-
-The algorithm we propose for deciding subtyping works by iterating through every possible
-choice that could be made between at branches of unions within the two types
-participating in a subtype check. In this section, we will describe the
-implementation of the algorithm in OCaml and will present our proof of
-correctness in the following section.
-
-The type language for our algorithm is a subset of that used in the Julia
-programming language, removing type variables. So as to avoid needing an
-additional externally-provided subtype hierarchy, we specify that atomic types
-(atoms) are subtypes only if they are exactly the same.
-
-\hspace{1em}
-
 \begin{figure}
 \center
 \begin{tabular}{cc|cc|c}
@@ -281,68 +263,103 @@ $\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
 
 \hspace{1em}
 
-$\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$
+$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
 
 \caption{Subtyping decision procedure example}
 \label{fig:cfs}
 \end{figure}
 
-\begin{minipage}{\textwidth}
-\begin{minipage}{0.4\textwidth}
+The greatest difficulty of subtyping union types is to ensure that all of
+the search space due to the union types forall/exist quantifications
+is explored.  We have seen that the syntax-directed rules, if not
+coupled with an ahead-of-time normalisation phase, do not ensure
+completeness of the search in presence of covariant tuples.
+
+The algorithm we propose for deciding subtyping works by iterating through every possible
+choice that could be made between at branches of unions within the two types
+participating in a subtype check. In this section, we will describe the
+implementation of the algorithm in OCaml and will present our proof of
+correctness in the following section.
+
+We focus on a core type language composed of binary unions, covariant binary
+tuples, and atom types:
+\begin{small}
 \begin{verbatim}
-type typ =
-  | Atom of int
-  | Tuple1 of typ
-  | Tuple2 of typ * typ
-  | Union of typ * typ
-
-type st_choice = Left | Right
+  type typ =
+    | Atom of int
+    | Tuple of typ * typ
+    | Union of typ * typ
 \end{verbatim}
-\end{minipage}
-\begin{minipage}{0.5\textwidth}
+\end{small}
+Atom types are singleton with respect to subtyping, and are ranged
+over by
+\(A, B, ...\).  Abusing the
+notation, we will assume that we also have unary
+tuples; these can be easily encoded. As running example we use the distributivity example from the
+introduction:
+$$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$
+In Figure~\ref{fig:cfs} we sketch the corresponding
+execution of the subtyping decision procedure.  Recall that to check
+if the relation holds, the algorithm needs to ensure that for every
+choice of the components of union types on the left hand side of the
+judgment there is a component of the union types on the right hand
+side such that subtyping holds.  In this case, the relation holds: no
+matter if we choose $A$ or $B$ on the left hand side inside the
+covariant tuple, we can always pick a matching type on the right hand
+side.  The key challenge for a subtyping algorithm not based on
+ahead-of-time normalisation it is to enumerate
+every possible choice of the components of the unions appearing in the
+left and right hand sides of the judgments.
+
+To do this, we base our approach on iterators. The \verb|st_choice|
+type represents whether the algorithm takes the left (first) or the
+right (second)
+component of a union type:
+\begin{small}
 \begin{verbatim}
-let rec initial_choice (a:typ) =
-  match a with
-  | Atom i -> []
-  | Tuple1 t -> initial_choice t
-  | Tuple2(t1,t2) -> (initial_choice t1) 
-  		@ (initial_choice t2)
-  | Union(l,r) -> Left::(initial_choice l)
+  type st_choice = Left | Right
 \end{verbatim}
-\end{minipage}
-\end{minipage}
-\hspace{1em}
+\end{small}
+The algorithm stores
+the choice made at each union at the present iteration in \emph{two stacks of}
+\verb|st_choice|\emph{s}, one for each side of the subtype relation.
+Each \verb|st_choice| stack can be seen as the state of an iterator that
+enumerates every union-type induced alternative in a given type.  One
+stack will be used to ensure that all \emph{forall} choices have been
+explored; the other stack to search for a matching \emph{exist} choice.
 
-\noindent An example execution of the subtyping decision procedure is shown in
-figure~\ref{fig:cfs}. Here, we are determining if $\tuple{\union{A}{B}} <:
-\union{\tuple{A}}{\tuple{B}}$. To check if the relation holds, the algorithm
-needs to ensure that for every instantiation on the left hand side that there
-is an instantiation of the right hand side such that the basic subtyping
-relation holds. In this case, the relation holds: no matter if we choose 
-$\tuple{A}$ or $\tuple{B}$ on the left hand side, we can always pick the
-same on the right hand side. Therefore, subtyping holds. The key challenge for
-a subtyping algorithm for this type language, then, is providing it with the ability
-to enumerate every possible instantiation of the left and right hand sides without
-needing to normalize.
+It is possible to define both an initial element and next state function for
+iterators defined using \verb|st_choice| stacks.
 
-To do this, we base our approach on iterators. The key construct for our
-algorithm is the \verb|st_choice| operation, which represents whether the
-algorithm takes the left or the right branch of a union. The algorithm stores
-the choice made at each union at the present iteration in two stacks of
-\verb|st_choice|s, one for each side of the subtype relation.
+%In turn, it is possible
+%to use \verb|st_choice| stacks to enumerate every possible choice that can
+%be made at union types within a program.
 
-A \verb|st_choice| stack can be seen as the state of an iterator that
-enumerates every union-type induced alternative in a given type. It is
-possible to define both an initial element and next state function for
-iterators defined using \verb|st_choice| stacks. In turn, it is possible
-to use \verb|st_choice| stacks to enumerate every possible choice that can
-be made at union types within a program.
 
+%% The type language for our algorithm is a subset of that used in the Julia
+%% programming language, removing type variables. So as to avoid needing an
+%% additional externally-provided subtype hierarchy, we specify that atomic types
+%% (atoms) are subtypes only if they are exactly the same.
+
+
+\begin{small}
+\begin{verbatim}
+  let rec initial_choice (a:typ) = 
+    match a with
+    | Atom i -> []
+    | Tuple(t1,t2) -> (initial_choice t1) @ (initial_choice t2)
+    | Union(l,r) -> Left::(initial_choice l)
+\end{verbatim}
+\end{small}
+%  | Tuple1 t -> initial_choice t
 We choose the initial value for our iterators to be the state where, every
 time a union type is encountered in the structure of the type, the iterator
-takes the  leftmost choice (as implemented in \verb|initial_choice|). As the
+takes the \verb+Left+ choice (as implemented in \verb|initial_choice|
+-- as we shall see when we will discuss the \verb+extend_list+
+function, empty lists are expanded on demand with the appropriate
+\verb+Left+ choices).  As the
 iterator continues through the possible choices, it will successively move
-right through the type until it reaches the state where at every  union type
+right through the type until it reaches the state where at every union type
 it encounters it takes the right-hand choice.
 
 \begin{figure}
@@ -360,6 +377,14 @@ L & \multicolumn{2}{c}{R} & RL \\
 \label{fig:sstep}
 \end{figure}
 
+Given this definition for the initial state, we can then define the
+iteration function.  We break the iteration function,
+\verb|next_state| up into two helper functions. The operation of these
+helpers is illustrated in figure~\ref{fig:sstep}. Here, starting from
+the initial state (where the iterator takes the \verb+Left+ choice at the
+root of the type), \verb|last_left_to_right| converts the \verb+Left+ choice
+into a \verb+Right+ choice.
+\begin{small}
 \begin{verbatim}
 let rec last_left_to_right 
     (acc:st_choice list) (ll : st_choice list option) = function
@@ -367,54 +392,57 @@ let rec last_left_to_right
   | Right::tl -> last_left_to_right (Right::acc) ll tl
   | [] -> option_map List.rev ll
 \end{verbatim}
+\end{small}
+However, because this is not yet a complete selection through the
+type, the \verb|extend_list| function, described below, is then used
+to appropriately pad out the type with left choices.
 
-With a definition for the initial state, we can then define the iteration function.
-We break the iteration function, \verb|next_state| up into two helper functions. The
-operation of these helpers is illustrated in figure~\ref{fig:sstep}. Here, starting
-from the initial state (where the iterator takes the leftmost choice at the root of
-the type), \verb|last_left_to_right| converts the left choice into a right choice. However,
-because this is not yet a complete selection through the type, \verb|extend_list| is then
-used to appropriately pad out the type with left choices.
+The \verb|last_left_to_right| function performs the incremental
+stepping-to-the-right operation at state transitions. It finds the
+final left choice in a given choice stack, truncates the stack to that
+left choice, and then converts it to a right. For example, given the
+type $\union{\union{A}{B}}{C}$ and the choice list \verb+LL+,
+\verb|last_left_to_right| will produce the choice list \verb+LR+
+(\verb+Left+ and \verb+Right+ are shortened here with \verb+L+ and
+\verb+R+); if given \verb+LR+, it will produce \verb+R+ (as the final
+left choice is at the top-level and it truncates the remainder of the
+choice list).
 
-\verb|last_left_to_right| performs the incremental stepping-to-the-right operation at
-state transitions. It finds the final left choice in a given choice stack, truncates the
-stack to that left choice, and then converts it to a right. For example, given the type 
-$\union{\union{A}{B}}{C}$ and the choice list LL, \verb|last_left_to_right| will 
-produce the choice list LR; if given LR, it will produce R (as the final left choice
-is at the top-level and it truncates the remainder of the choice list).
-
-\begin{verbatim}
-let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
-  | (Atom i, _) -> ([], ls)
-  | (Tuple1 t, _) -> extend_list t ls
-  | (Tuple2(t1,t2), _) -> let (hd,tl) = extend_list t1 ls in
-                          let (hd2,tl2) = extend_list t2 tl in
-                          (hd @ hd2, tl2)
-  | (Union(l,r), Left::rs) -> let (hd,tl) = extend_list l rs in (Left::hd,tl)
-  | (Union(l,r), Right::rs) -> let (hd,tl) = extend_list r rs in (Right::hd,tl)
-  | (Union(l,r), []) -> (Left::initial_choice l,[])
-\end{verbatim}
-
-On some types (such as that shown in figure~\ref{fig:sstep}), though, this
+On some types (such as that shown in Figure~\ref{fig:sstep}), though, this
 truncation leaves a partial path. \verb|extend_list| finds where the new
 choice list runs out and fills it out to be valid with respect to the type
 giving a valid state. If no successor state is found---if there are no Left
-choices that remain---then the function will return None. In figure~\ref{fig:sstep},
+choices that remain---then the function will return None. In Figure~\ref{fig:sstep},
 \verb|last_left_to_right| produced a partial path, as the right child of the root
 union is a union itself. \verb|extend_list| pads the list out to take the left choice
 at this child union, returning the path to validity.
-
+\begin{small}
 \begin{verbatim}
-let rec next_state (a:typ) (ls:st_choice list) =
-  option_map fst (option_map (extend_list a) (last_left_to_right [] None ls))
+  let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
+    | (Atom i, _) -> ([], ls)
+    | (Tuple(t1,t2), _) -> let (hd,tl) = extend_list t1 ls in
+                           let (hd2,tl2) = extend_list t2 tl in
+                           (hd @ hd2, tl2)
+    | (Union(l,r), Left::rs) -> let (hd,tl) = extend_list l rs in (Left::hd,tl)
+    | (Union(l,r), Right::rs) -> let (hd,tl) = extend_list r rs in (Right::hd,tl)
+    | (Union(l,r), []) -> (Left::initial_choice l,[])
 \end{verbatim}
+\end{small}
 
-\verb|next_state| combines these operations into a single step operation. It
-will take the deepest alternative choice at a union using
-\verb|last_left_to_right|, then add however many left choices is required to
-make the path valid using \verb|extend_list|. 
 
-Now that we have defined the core iterator infrastructure, we can show how it
+Finally the \verb|next_state| function combines these operations into
+a single step operation. It will take the deepest alternative choice
+at a union using \verb|last_left_to_right|, then add however many left
+choices is required to make the path valid using \verb|extend_list|.
+\begin{small}
+\begin{verbatim}
+  let rec next_state (a:typ) (ls:st_choice list) =
+    option_map fst (option_map (extend_list a) (last_left_to_right [] None ls))
+\end{verbatim}
+\end{small}
+
+
+Now that we have defined the core iterator infrastructure, we show how it
 is used to decide subtyping queries. The algorithm proceeds by maintaining two
 iterators (one for each side of the subtyping judgment) over choices-at-
 unions,  checking that for every instantiation of the left hand type there
@@ -423,40 +451,45 @@ fundamental subtyping relation, used to decide subtyping relationships when
 given instantiations of the left and right hand types, then describe the
 algorithm that iterates through those types.
 
+\begin{small}
 \begin{verbatim}
-type st_res =
-  | Subtype of st_choice list * st_choice list
-  | NotSubtype
+  type st_res =
+    | Subtype of st_choice list * st_choice list
+    | NotSubtype
 \end{verbatim}
+\end{small}
 
-\verb|st_res| represents the results of a single base subtype query. The query
+The type \verb|st_res| represents the results of a single base subtype query. The query
 can either succeed, in which case it provides the unused portion of the input
 stacks, or fail. 
 
+\begin{small}
 \begin{verbatim}
-let rec base_subtype (a:typ) (b:typ) (fa:st_choice list) (ex : st_choice list)
-  match (a,b,fa,ex) with
-  | (Atom i, Atom j, _, _) -> if i == j then Subtype(fa, ex) else NotSubtype
-  | (Tuple1 t1, Tuple1 t2, _, _) -> base_subtype t1 t2 fa ex
-  | (Tuple2(ta1, ta2), Tuple2(tb1, tb2), _, _) ->
-     (match base_subtype ta1 tb1 fa ex with
-      | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
-      | NotSubtype -> NotSubtype)
-  | (Union(a1,a2),b,choice::fa,ex) -> 
-  		base_subtype (match choice with Left -> a1 | Right -> a2) b fa ex
-  | (a,Union(b1,b2),fa,choice::ex) -> 
-  		base_subtype a (match choice with Left -> b1 | Right -> b2) fa ex
+  let rec base_subtype (a:typ) (b:typ) (fa:st_choice list) (ex : st_choice list)
+    match (a,b,fa,ex) with
+    | (Atom i, Atom j, _, _) -> if i == j then Subtype(fa, ex) else NotSubtype
+    | (Tuple(ta1, ta2), Tuple(tb1, tb2), _, _) ->
+       (match base_subtype ta1 tb1 fa ex with
+        | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
+        | NotSubtype -> NotSubtype)
+    | (Union(a1,a2),b,choice::fa,ex) -> 
+                base_subtype (match choice with Left -> a1 | Right -> a2) b fa ex
+    | (a,Union(b1,b2),fa,choice::ex) -> 
+                base_subtype a (match choice with Left -> b1 | Right -> b2) fa ex
 \end{verbatim}
+\end{small}
 
-\verb|base_subtype| is responsible for using two paths---one for the left and
-right hand sides of the subtyping relation---and checking that the subtype
-relation holds with respect to those paths. Given a basic type---an atom or a
-tuple---it will either check equality or recur respectively. Given a union, it
-will grab the choice to make at that union off of the choice stacks and continue
-recursively. The function then returns an instance of \verb|st_res|, which
-gives the remaining choice stacks if successful or nothing otherwise.
+The function \verb|base_subtype| is responsible for using two
+paths---one for the left and right hand sides of the subtyping
+relation---and checking that the subtype relation holds with respect
+to those paths. Given a basic type---an atom or a tuple---it will
+either check equality or recur respectively. Given a union type, it
+will choose the component of the union type following the choice
+stacks and continue recursively. The function then returns an instance
+of \verb|st_res|, which gives the remaining choice stacks if
+successful or nothing otherwise.
 
-
+\par
 Finally, to check subtyping, we need to iterate through both types in the 
 correct quantification order. Subtyping holds if, for every instantiation 
 of the left there exists an instantiation of the right hand side of the
@@ -466,19 +499,20 @@ infrastructure described previously. The algorithm is implemented in two
 functions. \verb|ex_subtype| checks that there exists an instantiation
 of the right-hand-side for a given left-hand-side. \verb|fa_ex_subtype|
 uses \verb|ex_subtype| to check that for every instantiation of the LHS,
-there is an instantiation of the RHS such that the subtype relation holds.
-
+there is an instantiation of the RHS such that the subtype relation
+holds.
+\par
+\begin{small}
 \begin{verbatim}
-let rec ex_subtype (a:typ)(b:typ)(fa:st_choice list)(cex : st_choice list) =
-  match base_subtype a b fa cex with (* is a <: b *)
-  | Subtype(_,_) -> true (* there exists a subtype *)
-  | NotSubtype -> 
-     (match next_state b cex with (* step exists-env *)
-      | Some ns -> ex_subtype a b fa ns (* continue *)
-      | None -> false) (* no subtype; exit *)
-
+  let rec ex_subtype (a:typ)(b:typ)(fa:st_choice list)(cex : st_choice list) =
+    match base_subtype a b fa cex with (* is a <: b *)
+    | Subtype(_,_) -> true (* there exists a subtype *)
+    | NotSubtype -> 
+       (match next_state b cex with (* step exists-env *)
+        | Some ns -> ex_subtype a b fa ns (* continue *)
+        | None -> false) (* no subtype; exit *)
 \end{verbatim}
-
+\end{small}
 If the current choice --- given by \verb|cex| --- is a supertype of the given \verb|a| according
 to \verb|base_subtype|, then \verb|ex_subtype| has found a valid instantiation of \verb|b|. Therefore,
 there exists an instantiation of \verb|b| that is a supertype of \verb|a| and the result should be true.
@@ -486,24 +520,28 @@ Otherwise, \verb|ex_subtype| will use the iteration operation, \verb|next_state|
 through choices for \verb|b| until it either finds an instantiation that is a supertype or runs out
 of instantiations.
 
-\begin{verbatim}
-let rec fa_ex_subtype (a:typ)(b:typ)(cfa:st_choice list) =
-  match ex_subtype a b cfa (initial_choice b) with (* a <: b wrt path? *)
-  | true -> (match next_state a cfa with
+\begin{small}
+  \begin{verbatim}
+  let rec fa_ex_subtype (a:typ)(b:typ)(cfa:st_choice list) =
+    match ex_subtype a b cfa (initial_choice b) with (* a <: b wrt path? *)
+    | true -> (match next_state a cfa with
                | Some ns -> fa_ex_subtype a b ns (* continue *)
                | None -> true) (* all subtypes; is subtype *)
-  | false -> false (* exists a non-subtype; not subtype *)
+    | false -> false (* exists a non-subtype; not subtype *)
 \end{verbatim}
+\end{small}
 
-\verb|fa_ex_subtype| is very similar. It checks that for every
+The function \verb|fa_ex_subtype| is similar; it checks that for every
 instantiation of \verb|a|, there exists an instantiation of 
 \verb|b| such that subtyping holds. Checking for an instantiation
 of \verb|b| is done using \verb|ex_subtype|, while \verb|fa_ex_subtype|
 maintains an iterator for \verb|a|.
 
+\begin{small}
 \begin{verbatim}
-let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
+  let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
 \end{verbatim}
+\end{small}
 
 Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
 It seeds \verb|fa_ex_subtype| with the initial choice for \verb|a|'s
@@ -517,7 +555,7 @@ implementation of this algorithm. With this optimization, memory linear in the
 total number of unions in a type is needed to decide subtyping between two types;
 no allocation besides that for the choice stacks is needed in the algorithm
 
-\section{Proof}
+\section{Correctness and completness}
 
 To prove correctness of our algorithm, we begin by formally specifying
 correctness for subtyping. We then show that three subtyping algorithms---
@@ -531,7 +569,6 @@ in the type language without unions through a simple transformation.
 \begin{align*}
 \denotes{\xt{A}} &= \{A\} \\
 \denotes{\union{t_1}{t_2}} &= \denotes{t1} \cup \denotes{t2} \\
-\denotes{\tupleo{t}} &= \{\tupleo{t'} | t' \in \denotes{t}\} \\
 \denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} | t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
 \end{align*}
 
@@ -556,58 +593,57 @@ The iterator-based implementation is directly equivalent (as will be shown
 later) to the choice-stack based implementation presented previously in OCaml.
 However, it retains type structure information inside of the iterator state.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Inductive TypeIterator: type -> Set :=
 | TIAtom : forall i, TypeIterator (atom i)
-| TITuple1 : forall tp, TypeIterator tp -> TypeIterator (tuple1 tp)
-| TITuple2 : forall t1 t2, TypeIterator t1 -> TypeIterator t2 -> TypeIterator (tuple2 t1 t2)
+| TITuple : forall t1 t2, TypeIterator t1 -> TypeIterator t2 -> TypeIterator (tuple t1 t2)
 | TIUnionL : forall t1 t2, TypeIterator t1 -> TypeIterator (union t1 t2)
 | TIUnionR : forall t1 t2, TypeIterator t2 -> TypeIterator (union t1 t2).
-\end{verbatim}
+\end{verbatim}\end{small}
 
 The \verb|TypeIterator| structure follows the structure of the type being
 iterated over. Choices at unions are represented as either an instance of
 \verb|TIUnionR| or \verb|TIUnionL|. This structure then lets us trivially
 define a function that extracts the current type at the iterator's position:
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Fixpoint current (t:type)(ti:TypeIterator t):type :=
 match ti with
 | TIAtom i => atom i
-| TITuple1 tip p => tuple1 (current tip p)
-| TITuple2 ti1 ti2 p1 p2 => tuple2 (current ti1 p1) (current ti2 p2)
+| TITuple ti1 ti2 p1 p2 => tuple (current ti1 p1) (current ti2 p2)
 | TIUnionL ti1 ti2 pl => (current ti1 pl)
 | TIUnionR ti1 ti2 pr => (current ti2 pr)
 end.
 \end{verbatim}
+\end{small}
 
-Next, we can define a function that produces the initial iterator state for a
+\noindent Next, we can define a function that produces the initial iterator state for a
 given type:
 
+\begin{small}
 \begin{verbatim}
 Fixpoint start_iterator (t:type):TypeIterator t :=
   match t with
   | (atom i) => TIAtom i
-  | (tuple1 t) => TITuple1 t (start_iterator t)
-  | (tuple2 t1 t2) => TITuple2 t1 t2 (start_iterator t1) (start_iterator t2)
+  | (tuple t1 t2) => TITuple t1 t2 (start_iterator t1) (start_iterator t2)
   | (union t1 t2) => TIUnionL t1 t2 (start_iterator t1)
   end.
 \end{verbatim}
+\end{small}
 
-Next, we can define a step function that takes one state and either steps it
+\noindent Next, we can define a step function that takes one state and either steps it
 to the next state or indicates that no such next state exists.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Fixpoint next_state (t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
   match ti with
   | TIAtom i => None
-  | TITuple1 tip p => option_map (TITuple1 tip) (next_state tip p)
-  | TITuple2 ti1 ti2 p1 p2 =>
+  | TITuple ti1 ti2 p1 p2 =>
     match (next_state ti2 p2) with
-    | Some np2 => Some(TITuple2 ti1 ti2 p1 np2)
+    | Some np2 => Some(TITuple ti1 ti2 p1 np2)
     | None =>
       match (next_state ti1 p1) with
-      | Some np1 => Some(TITuple2 ti1 ti2 np1 (start_iterator ti2))
+      | Some np1 => Some(TITuple ti1 ti2 np1 (start_iterator ti2))
       | None => None
       end
     end
@@ -618,7 +654,7 @@ Fixpoint next_state (t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
     end
   | TIUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next_state ti2 pr)
   end.
-\end{verbatim}
+\end{verbatim}\end{small}
 
 With these definitions, we can then prove a basic form of correctness with
 respect to the denotational or normalization semantics:
@@ -637,13 +673,13 @@ by iterating through the choices on the right for each choice on the left. We ca
 then define an induction principle for type iterators based on \verb|next_state|:
 
 \begin{theorem}
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Definition iter_rect
   (t:type) (P:TypeIterator t -> Set)
            (pi: forall it, next_state t it = None -> P it)
            (ps : forall it' it'', P it'' -> next_state t it' = Some it'' -> P it')
            (it : TypeIterator t) : P it  
-\end{verbatim}
+\end{verbatim}\end{small}
 
 For any type \verb|t| and proposition \verb|P|, and if:
 \begin{itemize} 
@@ -661,11 +697,11 @@ Using \verb|iter_rect|, we can implement and prove correct equivalent functions
 to \verb|ex_subtype|, \verb|fa_ex_subtype|, and \verb|subtype| as described in the
 OCaml implementation.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Definition exists_iter(a b : type) : 
   ({ t | InType t b /\ BaseSubtype a t } +
    {forall t, InType t b -> ~(BaseSubtype a t) }).
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \verb|exists_iter| is equivalent to the choice-stack based \verb|ex_subtype|,
 and determines if there exists some denotationally-contained type in \verb|b|
@@ -673,11 +709,11 @@ that is a supertype of the given \verb|a|. Internally, it is implemented in
 the same way as \verb|ex_subtype|, though using \verb|iter_rect| to iterate 
 through every iterator state.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Definition forall_iter (a b : type) :
   { forall t, In t (clauses a) -> exists t', InType t' b /\ (BaseSubtype t t')} +
   { exists t, In t (clauses a) /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \verb|forall_iter| is to \verb|fa_ex_subtype| what \verb|exists_iter| is to
 \verb|ex_subtype|. Like \verb|exists_iter| it implements the same decision procedure
@@ -688,15 +724,15 @@ Finally, we can define a decidable function (called \verb|subtype| in the proof)
 that decides whether two types are subtypes or not. \verb|subtype| simply invokes
 \verb|forall_iter| to decide subtyping.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Definition subtype(a b:type) : {NormalSubtype a b} + {~NormalSubtype a b}.
   destruct (forall_iter a b).
   - left. [...]
   - right. [...]
 Defined.
-\end{verbatim}
+\end{verbatim}\end{small}
 
-Therefore, using iterators, we can decide whether subtyping holds for any two types
+\noindent Therefore, using iterators, we can decide whether subtyping holds for any two types
 in our language. We will now show an equivalence between iterators and stacks-of-choices,
 allowing for more efficient implementation.
 
@@ -725,20 +761,19 @@ the same type, they select the same subset of that type. To describe this, we
 define \verb|lookup_path| which looks up what type is selected by a given
 choice stack.
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Fixpoint lookup_path(t:type)(p:st_context) : type * st_context :=
   match t, p with
   | atom i, _ => (t, p)
-  | tuple1 t, _ => let (r,p) := lookup_path t p in (tuple1 r, p)
-  | tuple2 t1 t2, _ =>
+  | tuple t1 t2, _ =>
     let (r1,p1) := lookup_path t1 p in
     let (r2,p2) := lookup_path t2 p1 in
-    (tuple2 r1 r2, p2)
+    (tuple r1 r2, p2)
   | union l r, false::rs => lookup_path l rs
   | union l r, true::rs => lookup_path r rs
   | _, nil => (t, nil)
   end.
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \verb|lookup_path| is notable in that it both returns the selected type as
 well as whatever of the choice stack remains once it reaches a leaf. This is
@@ -748,16 +783,15 @@ branches will potentially be given a longer choice stack then necessary.
 Next, we can convert iterators to paths in the straightforward manner, as
 implemented by \verb|iterator_to_path|:
 
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Fixpoint iterator_to_path(t:type)(it:TypeIterator t):st_context :=
    match it with
    | TIAtom _ => nil
-   | TITuple1 tp it1 => iterator_to_path tp it1
-   | TITuple2 t1 t2 it1 it2 => (iterator_to_path t1 it1) ++ (iterator_to_path t2 it2)
+   | TITuple t1 t2 it1 it2 => (iterator_to_path t1 it1) ++ (iterator_to_path t2 it2)
    | TIUnionL t1 _ it1 => false :: (iterator_to_path t1 it1)
    | TIUnionR _ t2 it1 => true :: (iterator_to_path t2 it1)
    end.
-\end{verbatim}
+\end{verbatim}\end{small}
 
 \verb|iterator_to_path| simply traverses the iterator in order, appending onto the
 output choice stack whatever choice the iterator makes at that union. This illustrates
@@ -769,9 +803,9 @@ can then show the first correctness property that we need to prove that the
 algorithm using choice stacks is correct:
 
 \begin{lemma}[Iterator to path is correct]
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 Lemma itp_correct : forall t it, current t it = fst (lookup_path t (iterator_to_path t it)).
-\end{verbatim}
+\end{verbatim}\end{small}
 
 For every type \verb|t| and type iterator \verb|it|, the iterator's current type \verb|current t it| is equal
 to the result of looking up the conversion of \verb|it| to a choice stack.
@@ -786,11 +820,11 @@ implementation. It only remains to show that this step operation (called
 \verb|next_state|.
 
 \begin{lemma}[Correctness of step\_ctx]
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 forall t it,
     step_ctx t (iterator_to_path t it) =
     (option_map (iterator_to_path t) (next_state t it)).
-\end{verbatim}
+\end{verbatim}\end{small}
 For every type \verb|t| and type iterator \verb|it|,
 stepping the choice-list equivalent of \verb|it| will
 produce the same result as converting the result of stepping
@@ -806,11 +840,11 @@ same, as are the implementations up to the addition of a fuel parameter (which
 is shown to be unnecessary). 
 
 \begin{lemma}[Correctness of existential subtype checking with choice stacks]
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 forall a b it, 
   (exists pf, exists_iter_inner a b it = inleft pf) <->
    exists n, ex_subtype a b (iterator_to_path b it) n = Some true.
-\end{verbatim}
+\end{verbatim}\end{small}
 For every two types \verb|a| and \verb|b|, the iterator-based algorithm
 \verb|exists_iter_inner| will produce a proof that \verb|a| is a subtype
 of \verb|b| if and only if there is an integer \verb|n| such that
@@ -821,11 +855,12 @@ See \verb|ex_sub_corr_eq| in the Coq proof.
 \end{proof}
 
 \begin{lemma}[Correctness of forall-exists subtype checking with choice stacks]
-\begin{verbatim}
+\begin{small}\begin{verbatim}
 forall a b it,
    (exists pf, forall_iter_inner a b it = left pf) <->
     exists n, fa_ex_subtype a b (iterator_to_path a it) n = Some true.
 \end{verbatim}
+\end{small}  
 For every two types \verb|a| and \verb|b|, the iterator-based algorithm
 \verb|forall_iter_inner| will produce a proof that \verb|a| is a subtype
 of \verb|b| if and only if there is an integer \verb|n| such that
