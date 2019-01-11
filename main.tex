@@ -514,11 +514,12 @@ It seeds \verb|fa_ex_subtype| with the initial choice for \verb|a|'s
 iterator, which then checks if for every instantiation of \verb|a|
 there exists an instantiation of \verb|b| such that subtyping holds.
 
-Figure~\ref{fig:cfs} shows the execution of this function when checking the
-relation $\tupleo{\union{A}{B}} <: \union{\tupleo{A}}{\tupleo{B}}$. For each
-instantiation of the $\forall$ choice stack, there needs to be an
-instantiation  of the $\exists$ stack such that when the type is subsetted
-using those stacks the subtype relation holds.
+We have presented our subtyping algorithm using lists of choices. In practical
+implementation, however, these lists of choices can be efficiently implemented
+(without allocation) by means of bit sets. This is the approach taken in the Julia
+implementation of this algorithm. With this optimization, memory linear in the
+total number of unions in a type is needed to decide subtyping between two types;
+no allocation besides that for the choice stacks is needed in the algorithm
 
 \section{Proof}
 
@@ -552,46 +553,6 @@ A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \deno
 Proving a subtyping algorithm sound and complete is therefore equivalent to
 producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; that is, is able to decide whether two types are
 subtypes or not.
-
-\subsection{Normalization}
-
-Following prior work, and to validate our definition, we first prove
-equivalence of our definition to normalization-based subtyping. To do so, we
-first define the normalization algorithm, then show that applying Vouillon-
-style~\cite{Vouillon04} typing rules over the normalized types satisfies our
-definition.
-
-For this simple type language, normalization is equivalent to computing the
-denotation set for the type. We define a metafunction \texttt{normalize}:
-
-\[
-\xt{normalize}(t) = \xt{Union}\{\denotes{t}\}
-\]
-
-For convenience of notation, we elide the nested unions that would be needed
-if $|\denotes{t}| > 2$ and that if $|\denotes{t}| = 1$ then no union will be
-generated. We can then define a correct semantic subtyping relation for our type
-language using this metafunction. 
-
-\begin{mathpar}
-\inferrule{\xt{normalize}(t_1) \bsub \xt{normalize}(t_2)}{t_1 \nsub t_2}
-\end{mathpar}
-
-This normalization-based subtyping relation satisfies definition~\ref{dfn:scr}.
-
-\begin{theorem}[Correctness of Normalization-Based Subtyping]
-$t_1 \nsub t_2$ iff $\forall t_1' \in \denotes{t_1},
-\exists t_2' \in \denotes{t_2}, t_1 \bsub t_2$
-\end{theorem}
-\begin{proof}
-See the Coq implementation of \verb|normalize_subtype|. 
-\end{proof}
-
-We have proven that normalization combined with classical structural
-type rules is equivalent to our denotational definition of subtyping.
-However, as previously mentioned, normalization is slow, space intensive,
-and precludes some algorithmic decisions on richer type languages. We therefore
-will next discuss our iterator-based algorithm for deciding subtyping.
 
 \subsection{Iterators}
 
@@ -878,8 +839,16 @@ of \verb|b| if and only if there is an integer \verb|n| such that
 See \verb|fa_sub_corr_eq| in the Coq proof.
 \end{proof}
 
-The choice stack-based algorithm produces the same results as the 
-iterator-based algorithm. 
+The choice stack-based algorithm therefore provably produces the same results
+as the iterator-based algorithm. 
+
+\section{Conclusion}
+
+We have presented an algorithm for deciding subtyping relationships between
+types that consist of atomic types, tuples, and unions. This algorithm is able
+to decide subtyping relationships in the presence of distributive semantics
+for union types without needing normalization (and therefore using linear
+space) and without additionally constraining type system features.
 
 %\bibliographystyle{plain}
 \bibliography{refs}
