@@ -223,13 +223,14 @@ of any subtype algorithm based on ahead-of-time disjunctive normalisation.
 %% concequence, variable instantiations may be over-specialized and some
 %% semantically-valid subtyping relations may not hold.
 
-In this \emph{pearl paper} we describe how the subtype algorithm
-implemented in the Julia language works and we will argue that it
-avoids the two drawbacks above.  To avoid being drawn in the vast
-complexity of Julia type algebra, we focus on a minimal language
-featuring union types, covariant tuples, and literals.  This tiny
-language is expressive enough to highlight the key ideas, and make
-this implementation technique known to a wider audience.  While Julia
+In this \emph{pearl paper} we describe the keys ideas used by the
+subtype algorithm implemented in the Julia language to deal with
+union types and covariant tuples, and we will argue that these avoid the
+two drawbacks above.  To avoid being drawn in the vast complexity of
+Julia type algebra, we focus on a minimal language featuring union
+types, covariant tuples, and literals.  This tiny language is
+expressive enough to highlight the decision strategy, and make this
+implementation technique known to a wider audience.  While Julia
 implementation shows that this technique extends, among others, to
 invariant constructors and existential
 types~\cite{DBLP:journals/pacmpl/NardelliBPCBV18}, we expect that it
