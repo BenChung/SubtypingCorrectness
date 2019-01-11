@@ -95,8 +95,8 @@
 \section{Subtyping union types and covariant tuples}
 
 Union types are increasingly common in mainstream languages.
-In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{},
-they are exposed at the source level. In others, as Hack~\cite{}, they
+In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{hejlsberg},
+they are exposed at the source level. In others, as Hack~\cite{hack}, they
 are only used internally when performing type inference; in all cases
 they play a key role in the expressiveness of the language.
 
@@ -113,14 +113,14 @@ Rules for subtyping union types have been known for a long time.  Following Voui
 These rules are asymmetrical. Following from set-theoretic intuitions,
 and as made formal by semantic subtyping models, when a union type
 appears on the left-hand side of a subtype judgment, then \emph{all}
-its component must be subtypes of the right-hand side; whan a union
+its components must be subtypes of the right-hand side; whan a union
 type appears on the right-hand side of a subtype judgment, then there
-must \emph{exist} one of its component that is a supertype of the
+must \emph{exist} a component that is a supertype of the
 left-hand side.
 
 It has also been known for a long time that, in presence of covariant
 tuples, the above rules are not complete with respect to a semantic
-subtyping model~\cite{}. Let us
+subtyping model~\cite{Pierce1991}. Let us
 recall the subtype rule for covariant tuples:
 \[
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
@@ -145,7 +145,7 @@ correct and complete.  However, this standard algorithm based on
 ahead-of-time normalization has \emph{two major drawbacks}.  The first
 drawback is that the normalization phase rewrites types into
 potentially \emph{exponentially bigger} types.
-This is a problem in practice.  Previous work~\cite{} instrumented
+This is a problem in practice.  Previous work~\cite{zappa2018julia} instrumented
 Julia's subtype decision procedure and when executing library code,
 routinely observed queries involving types as the one below:
 \begin{small}
@@ -234,7 +234,7 @@ expressive enough to highlight the decision strategy, and make this
 implementation technique known to a wider audience.  While Julia
 implementation shows that this technique extends, among others, to
 invariant constructors and existential
-types~\cite{DBLP:journals/pacmpl/NardelliBPCBV18}, we expect that it
+types~\cite{DBLP:NardelliBPCBV18}, we expect that it
 can be leveraged in many other modern language designs.  Additionally
 we prove in Coq that the algorithm is correct and complete with
 respect to a standard semantics subtyping model.
@@ -330,17 +330,6 @@ explored; the other stack to search for a matching \emph{exist} choice.
 
 It is possible to define both an initial element and next state function for
 iterators defined using \verb|st_choice| stacks.
-
-%In turn, it is possible
-%to use \verb|st_choice| stacks to enumerate every possible choice that can
-%be made at union types within a program.
-
-
-%% The type language for our algorithm is a subset of that used in the Julia
-%% programming language, removing type variables. So as to avoid needing an
-%% additional externally-provided subtype hierarchy, we specify that atomic types
-%% (atoms) are subtypes only if they are exactly the same.
-
 
 \begin{small}
 \begin{verbatim}
@@ -500,7 +489,7 @@ functions. \verb|ex_subtype| checks that there exists an instantiation
 of the right-hand-side for a given left-hand-side. \verb|fa_ex_subtype|
 uses \verb|ex_subtype| to check that for every instantiation of the LHS,
 there is an instantiation of the RHS such that the subtype relation
-holds.
+holds. 
 \par
 \begin{small}
 \begin{verbatim}
@@ -537,6 +526,18 @@ instantiation of \verb|a|, there exists an instantiation of
 of \verb|b| is done using \verb|ex_subtype|, while \verb|fa_ex_subtype|
 maintains an iterator for \verb|a|.
 
+The operation of \verb|fa_ex_subtype| and \verb|ex_subtype| as well as their
+calls to \verb|base_subtype| can be seen in figure~\ref{fig:cfs}. In the
+$\forall$ column, we see the current state maintained by \verb|fa_ex_subtype|.
+The $\exists$ column shows the state maintained by \verb|ex_subtype| as it is
+called by \verb|fa_ex_subtype|. In the example, for a forall-list of L, we an
+find an exists-list of L such that \verb|base_subtype| holds. Similarly,
+for a forall-list of R, we can find an exists-list instantiation of R such
+that subtyping holds. Therefore, for every instantaition of the left-hand-side,
+there exists an instantiation of the right-hand-side such that subtyping holds
+and subtyping holds for the type as a whole.
+
+
 \begin{small}
 \begin{verbatim}
   let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
@@ -555,11 +556,11 @@ implementation of this algorithm. With this optimization, memory linear in the
 total number of unions in a type is needed to decide subtyping between two types;
 no allocation besides that for the choice stacks is needed in the algorithm
 
-\section{Correctness and completness}
+\section{Correctness and completeness}
 
 To prove correctness of our algorithm, we begin by formally specifying
-correctness for subtyping. We then show that three subtyping algorithms---
-based on  normalization, structural iterators, and choice lists---are correct
+correctness for subtyping. We then show that two subtyping algorithms---
+based on structural iterators and choice lists---are correct
 with respect to this definition.
 
 We base our definition of subtyping on a denotational semantics for types. 
@@ -586,6 +587,12 @@ A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \deno
 Proving a subtyping algorithm sound and complete is therefore equivalent to
 producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; that is, is able to decide whether two types are
 subtypes or not.
+
+We will begin by describing and proving correct a version of the algorithm
+that uses explicit type-structural iterators. We will then show the choice
+stack-based algorithm correct by proving equivalence between structural
+iterators and choice stacks. In doing so, we will derive an induction
+principle for structural iterators (and, as an extension, for choice stacks).
 
 \subsection{Iterators}
 
