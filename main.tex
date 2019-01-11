@@ -1,4 +1,4 @@
-\documentclass[a4paper,english]{lipics-v2018}
+\documentclass[a4paper,english]{lipics-v2019}
 \usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx}%if unwanted, comment out or use option "draft"
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
@@ -38,7 +38,7 @@
 
 \Copyright{Anon}%Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, plea
 
-\subjclass{Dummy classification}% mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
+% mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
 
 \keywords{Type systems, Subtyping, Union types}
 
@@ -61,6 +61,7 @@
 % sol prob 2: ....
 %
 \acknowledgements{}%optional
+%\acknowledgements{Celeste Hollenbeck}
 
 %Editor-only macros:: begin (do not touch as author)%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \EventEditors{John Q. Open and Joan R. Access}
@@ -87,7 +88,7 @@
   system with union types, covariant tuples, and literals.  This
   algorithm is immune from the space-explosion and expressiveness
   problems of the standard algorithms based on normalising types in
-  disjuntcive normal form ahead-of-time.  We additionally prove it
+  disjunctive normal form ahead-of-time.  We prove this algorithm
   correct and complete against a semantic-subtyping denotational model
   in Coq.
 \end{abstract}
@@ -96,7 +97,7 @@
 
 Union types are increasingly common in mainstream languages.
 In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{hejlsberg},
-they are exposed at the source level. In others, as Hack~\cite{hack}, they
+they are exposed at the source level. In others, such as Hack~\cite{hack}, they
 are only used internally when performing type inference; in all cases
 they play a key role in the expressiveness of the language.
 
@@ -158,7 +159,7 @@ routinely observed queries involving types as the one below:
 \end{verbatim}
 \end{small}
 Normalizing this type before attempting to decide subtyping is not a
-realistic option.  However such types are often matched against
+realistic option. In practice, such types are often matched against
 structurally simpler types as
 \begin{small}
 \begin{verbatim}
@@ -167,23 +168,22 @@ structurally simpler types as
 \end{verbatim}
 \end{small}
 (where in Julia \verb+Any+ is the supertype of all types); in these cases
-without ahead-of-time normalisation it is possible to decide subtyping
-in linear time.
+it is possible to decide subtyping in linear time without ahead-of-time normalisation.
 
 The second drawback of ahead-of-time normalisation phase is that it
-does not interact nicely with other type system features. For instance
+does not interact well with other type system features. For instance,
 \emph{invariant constructors} make lifting all union types to the top
 level unsound.
 Consider the type \(\arrayt{\union{t_1}{t_2}}\), where \texttt{Array}
 is an invariant unary constructor.  This type
 denotes the set of arrays whose elements are either of type \(t_1\) or
-\(t_2\): it would be incorrect to rewrite it as
+\(t_2\); it would be incorrect to rewrite it as
 \(\union{\arrayt{t_1}}{\arrayt{t_2}}\),
 as this latter type denotes the set of arrays
 whose elements are either all of type \(t_1\) or all of type
 \(t_2\).  A weaker disjunctive normal form, only lifting union types inside
 each invariant constructor, can circumvent this
-problem, but only to reveal a deeper problem in the presence of
+problem. However, doing so only to reveals a deeper problem in the presence of
  both invariant constructors and \emph{existential types}.
 Consider the judgment below:
 \[
@@ -274,11 +274,10 @@ of possible forall/exist quantifications of union types. We have seen that
 syntax-directed rules need ahead-of-time normalisation in the presence of
 covariant tuples.
 
-The algorithm we propose for deciding subtyping works by iterating through every possible
-choice that could be made between at branches of unions within the two types
-participating in a subtype check.  In this section, we will describe the
-implementation of the algorithm in OCaml and will present our proof of
-correctness in the following section.
+The algorithm we propose for deciding subtyping works by iterating through
+choices made at unions along paths complete through the two types In this
+section, we will describe the implementation of the algorithm in OCaml and
+will present our proof of correctness in the following section.
 
 We focus on a core type language composed of binary unions, covariant binary
 tuples, and atom types:
@@ -411,7 +410,7 @@ at this child union, returning the path to validity.
 Finally, the \verb|next_state| function combines these operations into
 a single step operation. It will take the deepest alternative choice
 at a union using \verb|last_left_to_right|, then add however many left
-choices is required to make the path valid using \verb|extend_list|. The
+choices are required to make the path valid using \verb|extend_list|. The
 complete \verb|next_state| operation shown in figure~\ref{fig:sstep} takes
 the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
 choice stack RL. To do so, it takes the left choice, converts it to a right,
