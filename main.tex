@@ -239,9 +239,15 @@ we prove in Coq that the algorithm is correct and complete with
 respect to a standard semantics subtyping model.
 
 
-\section{Algorithm}
+\section{A space-efficient algorithm}
 
-Our algorithm for deciding subtyping works by iterating through every possible
+The greatest difficulty of subtyping union types is to ensure that all of
+the search space due to the union types forall/exist quantifications
+is explored.  We have seen that the syntax-directed rules, if not
+coupled with an ahead-of-time normalisation phase, do not ensure
+completeness of the search in presence of covariant tuples.
+
+The algorithm we propose for deciding subtyping works by iterating through every possible
 choice that could be made between at branches of unions within the two types
 participating in a subtype check. In this section, we will describe the
 implementation of the algorithm in OCaml and will present our proof of
