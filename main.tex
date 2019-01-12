@@ -83,11 +83,11 @@
 
 \maketitle
 \begin{abstract}
-  We describe the clever algorithm implemented in the Julia
-  programming language runtime to decide subtype on a simple type
+  We describe the algorithm implemented in the Julia
+  programming language runtime to decide subtyping on a simple type
   system with union types, covariant tuples, and literals.  This
   algorithm is immune from the space-explosion and expressiveness
-  problems of the standard algorithms based on normalising types in
+  problems of standard algorithms that normalise types into
   disjunctive normal form ahead-of-time.  We prove this algorithm
   correct and complete against a semantic-subtyping denotational model
   in Coq.
@@ -98,7 +98,7 @@
 Union types are increasingly common in mainstream languages.
 In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{hejlsberg},
 they are exposed at the source level. In others, such as Hack~\cite{hack}, they
-are only used internally when performing type inference; in all cases
+are only used internally when performing type inference. In all cases,
 they play a key role in the expressiveness of the language.
 
 Rules for subtyping union types have been known for a long time.  Following Vouillon~\cite{Vouillon04} they may be written as:
@@ -119,7 +119,7 @@ type appears on the right-hand side of a subtype judgment, then there
 must \emph{exist} a component that is a supertype of the
 left-hand side.
 
-It has also been known for a long time that, in presence of covariant
+It has also been known for a long time that, in the presence of covariant
 tuples, the above rules are not complete with respect to a semantic
 subtyping model~\cite{Pierce1991}. Let us
 recall the subtype rule for covariant tuples:
@@ -127,14 +127,14 @@ recall the subtype rule for covariant tuples:
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \]
 In a semantic subtyping model, covariant types should be
-\emph{distributive} with respect to unions, that is the following (and
+\emph{distributive} with respect to unions; that is, the following (and
 the opposite)
 derivation should hold:
 \[
 \tuple{\union{t_1}{t_2}, t} \ \ \sub\ \ \union{\tuple{t_1, t}}{\tuple{t_2, t}} 
 \]
 Here the rule for tuples cannot be applied, and a derivation must
-immediately solve the exist query for union types, picking either the
+immediately pick either the
 first or second component of the union type; as a result, it is
 impossible to complete the derivation.  The standard approach to solve
 this conundrum is to \emph{rewrite all types into their disjunctive
@@ -143,7 +143,9 @@ this conundrum is to \emph{rewrite all types into their disjunctive
 rewriting step is justified by the semantic-subtyping denotational
 model, as in~\cite{Frisch08}, and the resulting subtype algorithm can be proved both
 correct and complete.  However, this standard algorithm based on
-ahead-of-time normalization has \emph{two major drawbacks}.  The first
+ahead-of-time normalization has \emph{two major drawbacks}.
+
+The first
 drawback is that the normalization phase rewrites types into
 potentially \emph{exponentially bigger} types.
 This is a problem in practice.  Previous work~\cite{zappa2018julia} instrumented
@@ -160,17 +162,17 @@ routinely observed queries involving types as the one below:
 \end{small}
 Normalizing this type before attempting to decide subtyping is not a
 realistic option. In practice, such types are often matched against
-structurally simpler types as
+structurally simpler types like
 \begin{small}
 \begin{verbatim}
  Tuple{Tuple{Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any}, 
        Any}
 \end{verbatim}
 \end{small}
-(where in Julia \verb+Any+ is the supertype of all types); in these cases
+(where in Julia \verb+Any+ is the supertype of all types); in these cases,
 it is possible to decide subtyping in linear time without ahead-of-time normalisation.
 
-The second drawback of ahead-of-time normalisation phase is that it
+The second drawback of the ahead-of-time normalisation phase is that it
 does not interact well with other type system features. For instance,
 \emph{invariant constructors} make lifting all union types to the top
 level unsound.
@@ -195,12 +197,12 @@ perform the left-to-right subtype check due to the outer invariant
 constructor.  This step would generate the constraint \(T >:
 \union{t_1}{t_2}\).  As a consequence, the subsequent right-to-left
 check due to the invariant constructor fails.  Indeed this requires
-proving that \(\tuple{T} <: \union{\tuple{t_1}\tuple{t_2}}\), which
+proving that \(\tuple{T} <: \union{\tuple{t_1}}{\tuple{t_2}}\), which
 in turns attempts to prove either \(T <: t_1\) or \(T <: t_2\),
 both unprovable under the assumption that \(T >: \union{t_1}{t_2}\)
 The key to derive a successful judgment for this relation is to rewrite the
 right-to-left check into \(\tuple{T} <: \tuple{\union{t_1}{t_2}}\),
-which is provable. This is a sort of \emph{anti-normalisation} rewriting, that
+which is provable. This is a sort of \emph{anti-normalisation} rewriting that
 must be performed on sub-judgments of the derivation, and to the best
 of our knowledge it is not part
 of any subtype algorithm based on ahead-of-time disjunctive normalisation.
@@ -242,7 +244,33 @@ respect to a standard semantics subtyping model.
 
 \section{A space-efficient algorithm}
 
-\begin{figure}
+The greatest difficulty of subtyping union types is searching the entire space
+of possible forall/exist quantifications of union types. We have seen that
+syntax-directed rules need ahead-of-time normalisation in the presence of
+covariant tuples.
+
+The algorithm we propose for deciding subtyping works by iterating through
+choices made at unions along paths complete through the two types In this
+section, we will describe the implementation of the algorithm in OCaml and
+will present our proof of correctness in the following section.
+
+We focus on a core type language composed of binary unions, covariant binary
+tuples, and atom types:
+\begin{small}
+\begin{verbatim}
+  type typ =
+    | Atom of int
+    | Tuple of typ * typ
+    | Union of typ * typ
+\end{verbatim}
+\end{small}
+Atom types are singletons with respect to subtyping, and are ranged
+over by
+\(A, B, ...\).  Abusing the
+notation, we will assume that we also have unary
+tuples; these can be easily encoded. 
+
+\begin{figure}[h]
 \center
 \begin{tabular}{cc|cc|c}
 \multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
@@ -269,31 +297,7 @@ $\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
 \label{fig:cfs}
 \end{figure}
 
-The greatest difficulty of subtyping union types is searching the entire space
-of possible forall/exist quantifications of union types. We have seen that
-syntax-directed rules need ahead-of-time normalisation in the presence of
-covariant tuples.
-
-The algorithm we propose for deciding subtyping works by iterating through
-choices made at unions along paths complete through the two types In this
-section, we will describe the implementation of the algorithm in OCaml and
-will present our proof of correctness in the following section.
-
-We focus on a core type language composed of binary unions, covariant binary
-tuples, and atom types:
-\begin{small}
-\begin{verbatim}
-  type typ =
-    | Atom of int
-    | Tuple of typ * typ
-    | Union of typ * typ
-\end{verbatim}
-\end{small}
-Atom types are singletons with respect to subtyping, and are ranged
-over by
-\(A, B, ...\).  Abusing the
-notation, we will assume that we also have unary
-tuples; these can be easily encoded. As a running example we use the distributivity example from the
+As a running example we use the distributivity example from the
 introduction:
 $$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$
 In Figure~\ref{fig:cfs} we sketch the corresponding
@@ -426,8 +430,8 @@ type.
 
 Now that we have defined the core iterator infrastructure, we show how it
 is used to decide subtyping queries. The algorithm proceeds by maintaining two
-iterators (one for each side of the subtyping judgment) over choices-at-
-unions,  checking that for every instantiation of the left hand type there
+iterators (one for each side of the subtyping judgment) over choices-at-unions,  
+checking that for every instantiation of the left hand type there
 exists an instantiation of the right hand type. We will first define the
 fundamental subtyping relation, used to decide subtyping relationships when
 given instantiations of the left and right hand types, then describe the
@@ -542,12 +546,13 @@ It seeds \verb|fa_ex_subtype| with the initial choice for \verb|a|'s
 iterator, which then checks if for every instantiation of \verb|a|
 there exists an instantiation of \verb|b| such that subtyping holds.
 
-We have presented our subtyping algorithm using lists of choices. In practical
-implementation, however, these lists of choices can be efficiently implemented
-(without allocation) by means of bit sets. This is the approach taken in the Julia
-implementation of this algorithm. With this optimization, memory linear in the
-total number of unions in a type is needed to decide subtyping between two types;
-no allocation besides that for the choice stacks is needed in the algorithm
+We have presented our subtyping algorithm using lists of choices. In a
+practical implementation, however, these lists of choices can be efficiently
+implemented (without allocation) by means of bit sets. This is the approach
+taken in the Julia implementation of this algorithm. With this optimization,
+the needed memory to decide a subtyping judgment is linear in the total number
+of unions in the given types; the algorithm needs no allocation beyond that
+of the choice stacks themselves.
 
 \section{Correctness and completeness}
 
@@ -567,7 +572,7 @@ in the type language without unions through a simple transformation.
 \end{align*}
 
 Using this denotational semantics for types-with-unions, we can define
-subtyping as $\denotes{t_1} \subseteq \denotes{t_2}$, then $t_1 <: t_2$.
+subtyping as if $\denotes{t_1} \subseteq \denotes{t_2}$, then $t_1 <: t_2$.
 Equivalently, we can state this as definition~\ref{dfn:scr}, which is canonicalized
 in our Coq proof as the \verb|NormalSubtype| relation.
 
@@ -617,7 +622,7 @@ end.
 \end{verbatim}
 \end{small}
 
-\noindent Next, we can define a function that produces the initial iterator state for a
+\noindent We can then define a function that produces the initial iterator state for a
 given type:
 
 \begin{small}
@@ -804,7 +809,8 @@ algorithm using choice stacks is correct:
 
 \begin{lemma}[Iterator to path is correct]
 \begin{small}\begin{verbatim}
-Lemma itp_correct : forall t it, current t it = fst (lookup_path t (iterator_to_path t it)).
+Lemma itp_correct : forall t it, 
+  current t it = fst (lookup_path t (iterator_to_path t it)).
 \end{verbatim}\end{small}
 
 For every type \verb|t| and type iterator \verb|it|, the iterator's current type \verb|current t it| is equal
@@ -870,8 +876,8 @@ of \verb|b| if and only if there is an integer \verb|n| such that
 See \verb|fa_sub_corr_eq| in the Coq proof.
 \end{proof}
 
-The choice stack-based algorithm therefore provably produces the same results
-as the iterator-based algorithm. 
+The choice stack-based algorithm therefore is provably equivalent to the
+iterator-based algorithm, and is thus correct.
 
 \section{Conclusion}
 
