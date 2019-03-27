@@ -904,6 +904,54 @@ See \verb|fa_sub_corr_eq| in the Coq proof.
 The choice stack-based algorithm therefore is provably equivalent to the
 iterator-based algorithm, and is thus correct.
 
+\section{Performance Analysis}
+
+The algorithm improves upon normalization in two key ways:
+\begin{itemize}
+  \item lazily exploring possible clauses, obviating the need to store a fully normalized type;
+  \item enabling fast paths that avoid the exploration of the full choice space.
+\end{itemize}
+
+In the worst case, our algorithm has the same big-O time complexity. However,
+lazily exploring the choice space allows us to require worst-case polynomial
+space, in comparison to normalization's exponential space complexity.
+Similarly, the algorithm enables optimizations that offer best (and typical)
+case time complexity improvements from exponential to linear time.
+
+Worst case time complexity of both subtyping algorithms is determined by the
+number of clauses that would exist in the normalized type. In the worst case,
+(a tuple of unions), each union begets a different clause in the normalized
+type. Consider $\tuple{\union{A}{B}, \union{C}{D}}$, which will normalize to
+$\union{\tuple{A,C}}{\tuple{A, D}, \tuple{B, C}, \tuple{B, D}}$ generating a 
+new tuple for each choice for every contained union. As a result, there are
+worst-case $2^n$ tuples in the fully normalized version of a type that has $n$
+unions.
+
+In order to ensure correctness, each of these tuples (or choices at unions)
+must always be explored. As a result, both the algorithm we present here and
+normalization will have worst-case $O(2^n)$ time complexity. The approaches
+differ, however, in space complexity. The normalization approach computes and
+stores each of the exponentially many alternatives, so also has $O(2^n)$ space
+complexity. However, the algorithm we discuss need only store the choice made
+at each union, thereby offering $O(n)$ space complexity.
+
+The algorithm we discuss also can improve best-case time performance.
+Normalization will necessarily be $o(2^n)$ due to computation of the entire
+normalized type. However, the lazy subtyping algorithm need only make one
+choice before discovering that a subtype relation exists in the best-case,
+giving $o(n)$ performance. Moreover, computing type choices lazily enables
+fast-paths to short circuit full exploration of choice alternatives.
+
+This is important for Julia due to a common programming idiom. Many Julia
+library developers write signatures of the form $\tuple{\union{A}{B},
+\union{C}{D}}$ to indicate that their method can take any of the named
+types. When deciding dispatch against these methods, Julia will frequently
+check if a tuple containing solely concrete (instantiable) types is a subtype 
+of the tuple of unions. If Julia used normalization, this would always be 
+exponential on the number of unions that appeared in the argument list as this
+is the above mentioned worst-case exponential complexity case. However, its use
+of the lazy algorithm enables it frequently identify the best alternative and
+short circuit before having to explore much of the choice possibility space.
 
 \section{Conclusion}
 
