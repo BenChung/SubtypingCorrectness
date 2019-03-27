@@ -14,9 +14,6 @@
 \newcommand{\FZ}[1]{\textbf{FZ says: #1}}
 %end FZ
 
-\newcommand{\bsub}{<:_b}
-\newcommand{\nsub}{<:_n}
-
 \newcommand{\goodcell}{\cellcolor{green!25}}
 \newcommand{\badcell}{\cellcolor{red!25}}
 
@@ -153,7 +150,7 @@ ahead-of-time normalization has \emph{two major drawbacks}.
 The first
 drawback is that the normalization phase rewrites types into
 potentially \emph{exponentially bigger} types.
-This is a problem in practice.  Previous work~\cite{zappa2018julia} instrumented
+This is a problem in practice.  Previous work~\cite{DBLP:NardelliBPCBV18} instrumented
 Julia's subtype decision procedure and when executing library code,
 routinely observed queries involving types as the one below:
 \begin{small}
@@ -583,7 +580,7 @@ in our Coq proof as the \verb|NormalSubtype| relation.
 
 \begin{definition}[Subtyping Correctness]
 A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
-\exists t_2' \in \denotes{t_2}, t_1 \bsub t_2$.
+\exists t_2' \in \denotes{t_2}, t_1 <: t_2$.
 \label{dfn:scr}
 \end{definition}
 
@@ -669,11 +666,22 @@ Fixpoint next_state (t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
 With these definitions, we can then prove a basic form of correctness with
 respect to the denotational or normalization semantics:
 
-\begin{theorem}[Correctness of iterators]
-Every type in $\denotes{t}$ will be explored using \verb|next_step| from \verb|start_iterator t| 
+\begin{theorem}[Correctness of iterators]\begin{verbatim}
+Remaining t (start_iterator t) (clauses t)
+\end{verbatim}
+Every type in $\denotes{t}$ will be explored using \verb|next_step| from \verb|start_iterator t|. 
 \end{theorem}
 \begin{proof}
-See \verb|iterator_has_clauses| in the Coq proof.
+The \verb|Remaining| predicate relates iterators to the list of types that remain to be iterated, so
+the Coq theorem statement indicates that the initial state of the iterator for type $t$ has every clause
+in the normalized version of $t$ remaining to be iterated.
+
+We proceed by induction on $t$. The cases for atomic types and unions follow
+from the IH trivially. We prove the theorem for tuples correct by case analyzing
+on the number of clauses induced by the first element in the tuple, then identifying
+the next element produced by the iterator from the tuple.
+
+See \verb|iterator_has_clauses| in the Coq proof for full details.
 \end{proof}
 
 \verb|next_state| returns \verb|Some s| if there is some successor state
@@ -700,7 +708,19 @@ For any type \verb|t| and proposition \verb|P|, and if:
 Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
 \begin{proof}
-See the Coq definition of \verb|iter_rect|.
+Proving the induction principle for type iterators relies on the \verb|iternum|
+function, which decides the number of steps remaining in the iterator before termination.
+The proof proceeds by simultaneous case analysis on the number of remaining states and
+whether the iterator step function can produce a successor state from the present state.
+
+If the iteration number is not yet 0, and if there is a successor state, then
+we simply  appeal to the induction hypothesis and continue on. If there is no
+successor state but  the iteration number is nonzero or vice versa, then by
+lemma (\verb|iternum_monotonic|, taking an iterator step decrements the
+iteration number) contradiction. Finally, if there is no next step and the iteration
+number is 0, then we have reached the base case and terminate.
+
+For full details, see the Coq definition of \verb|iter_rect|.
 \end{proof}
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
@@ -883,6 +903,7 @@ See \verb|fa_sub_corr_eq| in the Coq proof.
 
 The choice stack-based algorithm therefore is provably equivalent to the
 iterator-based algorithm, and is thus correct.
+
 
 \section{Conclusion}
 
