@@ -272,69 +272,78 @@ over by
 notation, we will assume that we also have unary
 tuples; these can be easily encoded. 
 
-\begin{figure}[h]
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-    & \goodcell ${A} <: {A}$ \\
-\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \badcell ${A} \not<: {B}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-    & \badcell ${B} \not<: {A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \goodcell ${B} <: {B}$ \\
-\hline
-\end{tabular}
+%% Begin structural iterator based description
 
-\hspace{1em}
+We will begin by discussing a version of our algorithm that uses structurally-
+dependent iterators to explore types, then use that basis to describe our
+final space-efficient formulation and possible optimization thereof. 
 
-$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
+To illustrate our algorithm, we use the  distributivity example from the
+introduction: $$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$.
+Figure~\ref{fig:cfs} shows our algorithm's internal state when using  both the
+structural and space- efficient representations when deciding subtyping for
+this type.
 
-\caption{Subtyping decision procedure example}
-\label{fig:cfs}
-\end{figure}
+The fundamental operation the algorithm must accomplish is deciding if
+for every possible choice on the left if there exists some choice on the
+right such that subtyping holds. In order to do this, the algorithm iterates
+through each possible choice; both structural and space-efficient algorithms
+iterate over the same types in the same order, but do so using different yet 
+isomorphic internal representations.
 
-As a running example we use the distributivity example from the
-introduction:
-$$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$
-In Figure~\ref{fig:cfs} we sketch the corresponding
-execution of the subtyping decision procedure.  Recall that to check
-if the relation holds, the algorithm needs to ensure that for every choice 
-that could be made at a union types on the left hand side of the
-judgment there is a set of choices for the union types on the right hand
-side such that subtyping holds. In this example, the relation holds: no
-matter if we choose $A$ or $B$ on the left hand side inside the
-covariant tuple, we can always pick a matching type on the right hand
-side. The key challenge for a subtyping algorithm not based on
-ahead-of-time normalisation is to enumerate
-every possible choice of the components of the unions appearing in the
-left and right hand sides of the judgments.
+We will start by describing the operation of the algorithm that uses
+structural iterators. A structural iterator can be thought of as a sub-tree of
+the overarching type tree; we show these sub-trees in blue in
+figure~\ref{fig:cfs}. As there are no tuples in this example, the sub-trees
+are in fact paths for this case. It can be easily seen that we explore every
+path through the given type tree.
 
-To do this, we base our approach on iterators. The \verb|st_choice|
-type represents whether the algorithm takes the left (first) or the
-right (second)
-component of a union type:
+The main question is: "how do we step from one sub-tree to the next?" In order
+to explore every sub-tree, our algorithm finds the deepest (top-to-bottom,
+left-to-right) union where it took the left branch and generates a new tree
+where it instead takes the right branch. This is seen in
+figure~\ref{fig:sstep}, where the deepest union in the initial state is the
+root; the algorithm flips this to take the right choice and then fills out the
+sub-tree with left choices until it reaches a  leaf.
+
+Storing sub-trees is expensive, however, as it requires storing a very incomplete
+tree structure. Our space-efficient representation encodes the same information as 
+the sub-trees, but does so without itself being aware of the type being iterated over's
+structure. It linearizes the choices made to construct the sub-tree into a list, which
+can then be manipulated in a manner isomorphic to the sub-trees.
+
+Our space efficient representation stores choices that are made along a pre-order depth-first
+traversal of the iterated type tree. We can then manipulate this representation directly, avoiding
+the construction or storage of tree-structured iterators. The choices are stored as lists of 
+\verb|st_choice|s which
+indicate which branch of a union type was taken:
 \begin{small}
 \begin{verbatim}
   type st_choice = Left | Right
 \end{verbatim}
 \end{small}
-The algorithm stores
-the choice made at each union at the present iteration in \emph{two stacks of}
-\verb|st_choice|\emph{s}, one for each side of the subtype relation. 
-Each \verb|st_choice| stack can be seen as the state of an iterator that
-enumerates every union-type induced alternative in a given type.  One
-stack will be used to ensure that all \emph{forall} choices have been
-explored; the other stack to search for a matching \emph{exist} choice.
-In figure~\ref{fig:cfs}, these are depicted as the $\forall$ and $\exists$ stacks.
 
-It is possible to define both an initial element and next state function for
-iterators defined using \verb|st_choice| stacks.
+Lists of \verb|st_choice|s are isomorphic to the sub-tree representation when
+combined with the type being iterated over. To convert from sub-trees  to
+choice lists we simply conduct a preorder traversal of the sub-tree recording
+which choices were made along the way. Going from choice lists to sub-trees can
+be done by traversing the full type using the choice list while adding the traversed
+nodes to the sub-tree.
+
+% The algorithm stores
+% the choice made at each union at the present iteration in two stacks of
+% \verb|st_choice|s, one for each side of the subtype relation. 
+% Each \verb|st_choice| stack can be seen as the state of an iterator that
+% enumerates every union-type induced alternative in a given type.  One
+% stack will be used to ensure that all \emph{forall} choices have been
+% explored; the other stack to search for a matching \emph{exist} choice.
+% In figure~\ref{fig:cfs}, these are depicted as the $\forall$ and $\exists$ stacks.
+
+% It is possible to define both an initial element and next state function for
+% iterators defined using \verb|st_choice| stacks.
+
+Since our algorithm moves left-to-right through the type tree, we will
+initialize it with the state that takes the left choice at every union:
 
 \begin{small}
 \begin{verbatim}
@@ -346,16 +355,11 @@ iterators defined using \verb|st_choice| stacks.
 \end{verbatim}
 \end{small}
 %  | Tuple1 t -> initial_choice t
-We choose the initial value for our iterators to be the state where, every
-time a union type is encountered in the structure of the type, the iterator
-takes the \verb+Left+ choice (as implemented in \verb|initial_choice|
--- as we shall see when we will discuss the \verb+extend_list+
-function, empty lists are expanded on demand with the appropriate
-\verb+Left+ choices).
 
 \begin{figure}
 \begin{tabular}{cccc}
 & \hspace{5em} & &\\
+\multicolumn{2}{c}{Deepest-Left} & \multicolumn{2}{c}{Pad Remaining} \\
 \includegraphics[scale=0.6]{figures-gen/example1.pdf} &
 \multicolumn{2}{c}{\includegraphics[scale=0.6]{figures-gen/example2.pdf}} &
 \includegraphics[scale=0.6]{figures-gen/example3.pdf} \\
@@ -368,13 +372,27 @@ L & \multicolumn{2}{c}{R} & RL \\
 \label{fig:sstep}
 \end{figure}
 
-Given this definition for the initial state, we can then define the
-iteration function. We break the iteration function,
-\verb|next_state|, up into two helper functions. The operation of these
-helpers is illustrated in figure~\ref{fig:sstep}. Here, starting from
-the initial state (where the iterator takes the \verb+Left+ choice at the
-root of the type), \verb|last_left_to_right| converts the final \verb+Left+ choice
-into a \verb+Right+ choice and truncates the remaining choices.
+Next, we define the step function. In the sub-tree intuition, we want to find
+the deepest union (left-to-right through tuples) in our current sub-tree where
+we made a left choice. In our resulting sub-tree, we take the alternative
+(right) choice at this deepest left choice, then make left choices until we
+reach a leaf. This operation is visualized in figure~\ref{fig:sstep}; we 
+first find the deepest left choice, take the right choice at that union,
+and then pad out the choices we make until we reach a leaf.
+
+This intuition guides our definition of the compact-representation stepping
+function. We first identify the deepest left choice and replace it with a
+right choice (using \verb|last_left_to_right|), then pad out the remaining
+choices until we reach a leaf (using \verb|extend_list|).
+
+The first component of stepping is identify and toggling the left-to-right
+deepest left choice that would be made for a path's equivalent sub-tree. Note
+that, because we use ``deepest'' to be top-to-bottom left-to-right, the inorder
+traversal we define over subtrees to relate them to choice lists will output the
+choices made in order of their depth. As a result, it suffices to find the last
+left choice in the list, turn it into a right choice, and truncate the list at that
+point. This is implemented in the \verb|last_left_to_right| function, as follows:
+
 \begin{small}
 \begin{verbatim}
 let rec last_left_to_right 
@@ -385,20 +403,19 @@ let rec last_left_to_right
 \end{verbatim}
 \end{small}
 
-For example, given the
-type $\union{\union{A}{B}}{C}$ and the choice list \verb+LL+,
-\verb|last_left_to_right| will produce the choice list \verb+LR+
-(\verb+Left+ and \verb+Right+ are shortened here with \verb+L+ and
-\verb+R+); if given \verb+LR+, it will produce \verb+R+ (as the final
-left choice is at the top-level and it truncates the remainder of the
-choice list).
+For example, given the type $\union{\union{A}{B}}{C}$ and the choice list
+\verb+LL+, \verb|last_left_to_right| will produce the choice list \verb+LR+
+(\verb+Left+ and \verb+Right+ are shortened here with \verb+L+ and \verb+R+);
+if given \verb+LR+, it will produce \verb+R+ (as the final left choice is at
+the top-level and it truncates the remainder of the choice list).
 
-In Figure~\ref{fig:sstep},
-\verb|last_left_to_right| produced a partial path, as the right child of the root
-union is a union itself. To solve this, \verb|extend_list| finds where the new
-choice list runs out and fills it out with left choices to be valid with respect to the type,
-producing a valid state. \verb|extend_list| pads the list out to take the left choice
-at this child union, returning the path to validity.
+However, as seen in figure~\ref{fig:sstep}, the truncation operation may produce
+an equivalent sub-tree that does not reach a leaf and is therefore not complete.
+This will happen when the children of a union in a type are not themselves leaves.
+To address this case, we then need to ``pad out'' the selected path so that it reaches
+a leaf within the type. Based on the same logic as we used for initialization, it follows
+that we should do so with all left choices. The implementation of this is in \verb|extend_list|,
+as follows
 \begin{small}
 \begin{verbatim}
   let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
@@ -429,10 +446,43 @@ type.
 \end{verbatim}
 \end{small}
 
+\subsection{Subtyping}
+
+\begin{figure}[h]
+\center
+\begin{tabular}{cc|cc|c}
+\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
+\hline
+$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
+\hline
+\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
+    & \goodcell ${A} <: {A}$ \\
+\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \badcell ${A} \not<: {B}$ \\
+\hline
+\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
+    & \badcell ${B} \not<: {A}$ \\
+\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \goodcell ${B} <: {B}$ \\
+\hline
+\end{tabular}
+
+\hspace{1em}
+
+$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
+
+\caption{Subtyping decision procedure example}
+\label{fig:cfs}
+\end{figure}
 
 Now that we have defined the core iterator infrastructure, we show how it
-is used to decide subtyping queries. The algorithm proceeds by maintaining two
-iterators (one for each side of the subtyping judgment) over choices-at-unions,  
+is used to decide subtyping queries. Subtyping is defined on a forall-exists
+basis, or for every choice on the left there must exist a choice on the right
+such that basic subtyping (in our case, subtyping without unions) holds. We
+use our iterator framework to implement this in the straightforward manner, 
+iterating through each choice on each side and checking if a relationship holds.
+
+The algorithm proceeds by maintaining two iterators (one for each side of the subtyping judgment) over choices-at-unions,  
 checking that for every instantiation of the left hand type there
 exists an instantiation of the right hand type. We will first define the
 fundamental subtyping relation, used to decide subtyping relationships when
