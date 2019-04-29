@@ -121,26 +121,36 @@ type appears on the right-hand side of a subtype judgment, then there
 must \emph{exist} a component that is a supertype of the
 left-hand side.
 
-It has also been known for a long time that, in the presence of covariant
-tuples, the above rules are not complete with respect to a semantic
-subtyping model~\cite{Pierce1991}. Let us
-recall the subtype rule for covariant tuples:
+While this rule system makes sense, it leads to some surprising results.
+The notion that subtyping should allow the substitution of any subtype
+for a supertype is both natural and common. Under this justification, 
+one might logically expect a union type to act as a set-theoretic union. 
+However, with a trivial addition to our type language the above rules 
+violate the set-theoretic underpinning that would be expected from a 
+semantic subtyping~\cite{Pierce1991} system.
+
+Let us recall the subtype rule for covariant tuples:
 \[
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \]
-In a semantic subtyping model, covariant types should be
-\emph{distributive} with respect to unions; that is, the following (and
-the opposite)
-derivation should hold:
+When we add this rule to our system, unusual behaviour then appears. Consider
+the following judgment:
 \[
 \tuple{\union{t_1}{t_2}, t} \ \ \sub\ \ \union{\tuple{t_1, t}}{\tuple{t_2, t}} 
 \]
-Here the rule for tuples cannot be applied, and a derivation must
-immediately pick either the
-first or second component of the union type; as a result, it is
-impossible to complete the derivation.  The standard approach to solve
-this conundrum is to \emph{rewrite all types into their disjunctive
-  normal form} (DNF), that is as unions of union-free types,
+If we were to assume a semantic semantics for our type system, this judgment should
+hold. The left hand side denotes the values $\{\tuple{v_1,v_2}\} | v_1 \in \llbracket t_1 \rrbracket \cup \llbracket t_2 \rrbracket \wedge v_2 \in \llbracket t \rrbracket \}$,
+and the right hand side denotes $\llbracket \tuple{t_1, t} \rrbracket \cup \llbracket \tuple{t_2, t} \rrbracket$, where $\llbracket t \rrbracket$ indicates the
+set of values denoted by $t$. It is obvious that these two sets are the same, and thus under
+a semantic understanding of subtyping we would therefore conclude that our judgment should be 
+derivable.
+
+However, under the above proposed rules for subtyping of unions and tuples the 
+subtyping relation cannot be concluded. To attempt to derive the judgment, we
+have to first pick the first or second element of the union. However, any choice
+we make will cause the right-hand-side to become overspecialized. The standard 
+approach to solve this conundrum is to \emph{rewrite all types into their disjunctive
+  normal form} (DNF), as unions of union-free types,
 \emph{before} building the derivation. The correctness of this
 rewriting step is justified by the semantic-subtyping denotational
 model, as in~\cite{Frisch08}, and the resulting subtype algorithm can be proved both
