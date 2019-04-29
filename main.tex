@@ -52,16 +52,26 @@
 
 \funding{}%optional, to capture a funding statement, which applies to all authors. Please enter author specific funding statements as fifth argument of the \author macro.
 
-% put the algorithm up front and explanation
-% here's a cute and simple algorithm that works for distributive tuples and unions
-% write it with imperative stacks
-% tuple union is hard known for 20yrs sol w/ normalization
-% prob 1: state explosion (also seen in swift) CDeuce approach doesn't work
-% prob 2: expressivity interacting with rhicher type system normalization doesn't work at all
-% what we show is an alternative way to deal with distributive subtyping
-% sol prob 1: lazy stack-based subtyping algorithm
-% sol prob 2: ....
-%
+% jan comments 4/24/19
+% code bits are fairly wordy; see if both OCaml and Coq can be trimmed down
+% do we explain that we have both OCaml and Coq
+% how clear are the code bits?
+% clarify last_left_to_right; do with a fold?
+% better motivate this in the intro? 
+%    bit of julia?
+%    other features that make this important to solve?
+%    intro should be longer and take more time
+% talks about semantic subtyping as if it's a fact, but doesn't explain what it is or why we should care
+% figures
+%   haven't spent enough time looking at them
+%   may not help
+% references
+%    subtyping cites
+%       if there's one that's subsuming others then cite that
+%       but if there's some alternatives then cite the lot
+
+
+
 \acknowledgements{}%optional
 %\acknowledgements{Celeste Hollenbeck}
 
@@ -98,7 +108,7 @@
 \section{Subtyping union types and covariant tuples}
 
 Union types are increasingly common in mainstream languages.
-In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{hejlsberg},
+In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{typescript},
 they are exposed at the source level. In others, such as Hack~\cite{hack}, they
 are only used internally when performing type inference. In all cases,
 they play a key role in the expressiveness of the language.
@@ -254,7 +264,7 @@ covariant tuples.
 The algorithm we propose for deciding subtyping works by iterating through
 choices made at unions along paths complete through the two types In this
 section, we will describe the implementation of the algorithm in OCaml and
-will present our proof of correctness in the following section.
+will present our proof of correctness in Coq in the following section.
 
 We focus on a core type language composed of binary unions, covariant binary
 tuples, and atom types:
@@ -278,12 +288,6 @@ We will begin by discussing a version of our algorithm that uses structurally-
 dependent iterators to explore types, then use that basis to describe our
 final space-efficient formulation and possible optimization thereof. 
 
-To illustrate our algorithm, we use the  distributivity example from the
-introduction: $$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$.
-Figure~\ref{fig:cfs} shows our algorithm's internal state when using  both the
-structural and space- efficient representations when deciding subtyping for
-this type.
-
 The fundamental operation the algorithm must accomplish is deciding if
 for every possible choice on the left if there exists some choice on the
 right such that subtyping holds. In order to do this, the algorithm iterates
@@ -291,12 +295,10 @@ through each possible choice; both structural and space-efficient algorithms
 iterate over the same types in the same order, but do so using different yet 
 isomorphic internal representations.
 
-We will start by describing the operation of the algorithm that uses
-structural iterators. A structural iterator can be thought of as a sub-tree of
-the overarching type tree; we show these sub-trees in blue in
-figure~\ref{fig:cfs}. As there are no tuples in this example, the sub-trees
-are in fact paths for this case. It can be easily seen that we explore every
-path through the given type tree.
+A structural iterator can be thought of as a sub-tree of the overarching type
+tree; we show these sub-trees in blue in figure~\ref{fig:cfs}. As there are no
+tuples in this example, the sub-trees are in fact paths for this case. It can
+be easily seen that we explore every path through the given type tree.
 
 The main question is: "how do we step from one sub-tree to the next?" In order
 to explore every sub-tree, our algorithm finds the deepest (top-to-bottom,
@@ -395,11 +397,15 @@ point. This is implemented in the \verb|last_left_to_right| function, as follows
 
 \begin{small}
 \begin{verbatim}
-let rec last_left_to_right 
-    (acc:st_choice list) (ll : st_choice list option) = function
-  | Left::tl -> last_left_to_right (Left::acc) (Some (Right::acc)) tl
-  | Right::tl -> last_left_to_right (Right::acc) ll tl
-  | [] -> option_map List.rev ll
+let rec toggle_truncate = function
+  | [] -> []    
+  | Left::tl -> Right::tl
+  | Right::tl -> toggle_truncate tl
+
+let last_left_to_right (l:st_choice list) =
+  match List.rev (toggle_truncate (List.rev l)) with
+  | [] -> None
+  | hd::tl -> Some(hd::tl)
 \end{verbatim}
 \end{small}
 
@@ -482,6 +488,12 @@ such that basic subtyping (in our case, subtyping without unions) holds. We
 use our iterator framework to implement this in the straightforward manner, 
 iterating through each choice on each side and checking if a relationship holds.
 
+To illustrate our algorithm, we use the  distributivity example from the
+introduction: $$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$
+Figure~\ref{fig:cfs} shows our algorithm's internal state when using  both the
+structural and space- efficient representations when deciding subtyping for
+this type.
+
 The algorithm proceeds by maintaining two iterators (one for each side of the subtyping judgment) over choices-at-unions,  
 checking that for every instantiation of the left hand type there
 exists an instantiation of the right hand type. We will first define the
@@ -551,7 +563,7 @@ holds.
         | None -> false) (* no subtype; exit *)
 \end{verbatim}
 \end{small}
-If the current choice --- given by \verb|cex| --- is a supertype of the given \verb|a| according
+If the current choice---given by \verb|cex|---is a supertype of the given \verb|a| according
 to \verb|base_subtype|, then \verb|ex_subtype| has found a valid instantiation of \verb|b|. Therefore,
 there exists an instantiation of \verb|b| that is a supertype of \verb|a| and the result should be true.
 Otherwise, \verb|ex_subtype| will use the iteration operation, \verb|next_state|, to continue iterating
@@ -589,7 +601,7 @@ and subtyping holds for the type as a whole.
 
 \begin{small}
 \begin{verbatim}
-  let rec subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
+  let subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
 \end{verbatim}
 \end{small}
 
@@ -611,7 +623,7 @@ of the choice stacks themselves.
 To prove correctness of our algorithm, we begin by formally specifying
 correctness for subtyping. We then show that two subtyping algorithms---
 based on structural iterators and choice lists---are correct
-with respect to this definition.
+with respect to this definition in Coq.
 
 We base our definition of subtyping on a denotational semantics for types. 
 We reduce types in the type language including unions to sets of types
@@ -646,7 +658,7 @@ principle for structural iterators (and, as an extension, for choice stacks).
 
 \subsection{Iterators}
 
-The iterator-based implementation is directly equivalent (as will be shown
+The Coq iterator-based implementation is directly equivalent (as will be shown
 later) to the choice-stack based implementation presented previously in OCaml.
 However, it retains type structure information inside of the iterator state.
 
