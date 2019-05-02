@@ -1,5 +1,5 @@
 \documentclass[a4paper,english]{lipics-v2019}
-\usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx}%if unwanted, comment out or use option "draft"
+\usepackage{microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx,tabularx}%if unwanted, comment out or use option "draft"
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
 %\newcommand{\tupleo}[1]{\xt{Tuple1\{}#1\xt{\}}}
@@ -44,12 +44,11 @@
 
 % jan comments 4/24/19
 % code bits are fairly wordy; see if both OCaml and Coq can be trimmed down
-% do we explain that we have both OCaml and Coq
 % how clear are the code bits? 
 % clarify last_left_to_right; do with a fold? <- attempted fix
 % better motivate this in the intro
-%    bit of julia?
-%    other features that make this important to solve?
+%    bit of julia? <- attempted fix
+%    other features that make this important to solve? <- attempted fix
 %    intro should be longer and take more time
 % talks about semantic subtyping as if it's a fact, but doesn't explain what it is or why we should care <- attempted fix
 % figures
@@ -97,11 +96,13 @@
 
 \section{Subtyping union types and covariant tuples}
 
-Union types are increasingly common in mainstream languages.
-In some cases, as Julia~\cite{BezansonEKS17} or TypeScript~\cite{typescript},
-they are exposed at the source level. In others, such as Hack~\cite{hack}, they
-are only used internally when performing type inference. In all cases,
-they play a key role in the expressiveness of the language.
+Union types, originally introduced by Barbanera and Dezani-
+Ciancaglini~\cite{barbanera1991intersection}, are increasingly common in
+mainstream languages. In some cases, as Julia~\cite{BezansonEKS17} or
+TypeScript~\cite{typescript}, they are exposed at the source level. In others,
+such as Hack~\cite{hack}, they are only used internally when performing type
+inference. In all cases, they play a key role in the expressiveness of the
+language.
 
 Rules for subtyping union types have been known for a long time.  Following Vouillon~\cite{Vouillon04} they may be written as:
 \begin{mathpar}
@@ -145,24 +146,30 @@ set of values denoted by $t$. It is obvious that these two sets are the same, an
 a semantic understanding of subtyping we would therefore conclude that our judgment should be 
 derivable.
 
-However, under the above proposed rules for subtyping of unions and tuples the 
-subtyping relation cannot be concluded. To attempt to derive the judgment, we
-have to first pick the first or second element of the union. However, any choice
-we make will cause the right-hand-side to become overspecialized. The standard 
-approach to solve this conundrum is to \emph{rewrite all types into their disjunctive
-  normal form} (DNF), as unions of union-free types,
-\emph{before} building the derivation. The correctness of this
-rewriting step is justified by the semantic-subtyping denotational
-model, as in~\cite{Frisch08}, and the resulting subtype algorithm can be proved both
-correct and complete.  However, this standard algorithm based on
-ahead-of-time normalization has \emph{two major drawbacks}.
+However, under the above proposed rules for subtyping of unions and tuples the
+subtyping relation cannot be concluded. Under the above rules, we must pick a
+choice of the  right-hand union to continue. However, any choice we make will
+cause the right-hand-side to become overspecialized; picking the left or right
+choices at the union will cause the right-hand-side to match $t_1$ or $t_2$ in 
+the first position, yet the left-hand-side could take on \emph{either} in that 
+position.
 
-The first
-drawback is that the normalization phase rewrites types into
-potentially \emph{exponentially bigger} types.
-This is a problem in practice.  Previous work~\cite{DBLP:NardelliBPCBV18} instrumented
-Julia's subtype decision procedure and when executing library code,
-routinely observed queries involving types as the one below:
+The standard  approach to solve this conundrum is to \emph{rewrite all types
+into their disjunctive normal form} (DNF), as unions of union-free types,
+\emph{before} building the derivation. The correctness of this rewriting step
+is justified by the semantic-subtyping denotational model, as
+in~\cite{Frisch08}, and the resulting subtype algorithm can be proved both
+correct and complete.  However, this standard algorithm based on ahead-of-time
+normalization has \emph{two major drawbacks}.
+
+The first drawback is that the normalization phase rewrites types into
+potentially \emph{exponentially bigger} types, a serious practical problem.
+The Julia programming language allows programmers to write union types in function
+arguments, types that must then be compared against actual types at call sites using
+subtyping. Previous work~\cite{DBLP:NardelliBPCBV18} instrumented Julia's subtype
+decision procedure to examine the prevalance and use of such union types, and routinely observed queries
+such as the following:
+
 \begin{small}
 \begin{verbatim}
  Tuple{Tuple{Union{Int64, Bool}, Union{String, Bool}, Union{String, Bool}, 
@@ -173,16 +180,23 @@ routinely observed queries involving types as the one below:
 \end{verbatim}
 \end{small}
 Normalizing this type before attempting to decide subtyping is not a
-realistic option. In practice, such types are often matched against
-structurally simpler types like
+realistic option. Each choice at each union can be thought of as a digit in a
+binary number, all of which must be expanded when normalizing, so the 
+fully-normalized form would have $2^15$ or 32,768 terms. Storing this normalized
+type is not practical.
+
+Moreover, full expansion is frequently unnecessary. In practice, such types are often 
+matched against structurally simpler types like
 \begin{small}
 \begin{verbatim}
  Tuple{Tuple{Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any}, 
        Any}
 \end{verbatim}
 \end{small}
-(where in Julia \verb+Any+ is the supertype of all types); in these cases,
-it is possible to decide subtyping in linear time without ahead-of-time normalisation.
+(where in Julia \verb+Any+ is the supertype of all types). If we forgo
+normalisation, it is possible to decide subtyping with such simple types
+in linear time. This performance would be vastly preferred to the exponential
+time performance of normalisation.
 
 The second drawback of the ahead-of-time normalisation phase is that it
 does not interact well with other type system features. For instance,
@@ -219,6 +233,12 @@ must be performed on sub-judgments of the derivation, and to the best
 of our knowledge it is not part
 of any subtype algorithm based on ahead-of-time disjunctive normalisation.
 
+Previous work has either not offered distributivity or uses normalisation.
+The earliest work, by Barbanera and Dezani-Ciancaglini~\cite{barbanera1991intersection} and
+Pierce~\cite{Pierce1991} uses normalization to decide distributive subtyping between
+union types. Vouillon~\cite{Vouillon04} does not support distributivity at all as a limitation 
+of their approach. 
+
 
 %% FZN : Duplicate of text already written
 %% FZN : fix citations above though.
@@ -251,7 +271,7 @@ invariant constructors and existential
 types~\cite{DBLP:NardelliBPCBV18}, we expect that it
 can be leveraged in many other modern language designs.  Additionally
 we prove in Coq that the algorithm is correct and complete with
-respect to a standard semantics subtyping model.
+respect to a standard semantic subtyping model.
 
 
 \section{A space-efficient algorithm}
@@ -359,17 +379,16 @@ initialize it with the state that takes the left choice at every union:
 %  | Tuple1 t -> initial_choice t
 
 \begin{figure}
-\begin{tabular}{cccc}
-& \hspace{5em} & &\\
-\multicolumn{2}{c}{Deepest-Left} & \multicolumn{2}{c}{Pad Remaining} \\
-\includegraphics[scale=0.6]{figures-gen/example1.pdf} &
-\multicolumn{2}{c}{\includegraphics[scale=0.6]{figures-gen/example2.pdf}} &
-\includegraphics[scale=0.6]{figures-gen/example3.pdf} \\
-L & \multicolumn{2}{c}{R} & RL \\
-\multicolumn{2}{c}{last\_left\_to\_right} & \multicolumn{2}{c}{extend\_list} \\
-\hline
-\multicolumn{4}{c}{next\_state} \\
-\end{tabular}
+\centering
+\begin{tabularx}{\linewidth}{c|ccc}
+& Initial & Stepped & Padded\\
+Subtree: &
+\includegraphics[scale=0.55]{figures-gen/transex1.pdf} & 
+\includegraphics[scale=0.55]{figures-gen/transex2.pdf} & 
+\includegraphics[scale=0.55]{figures-gen/transex3.pdf} \\
+Choice List: & \underline{L}R & \underline{R} & \underline{R}L \\
+Effective Type: & \tuple{A,D} & \tuple{B,?} & \tuple{B,C} \\
+\end{tabularx}
 \caption{State-stepping operation for choice lists}
 \label{fig:sstep}
 \end{figure}
@@ -378,22 +397,30 @@ Next, we define the step function. In the sub-tree intuition, we want to find
 the deepest union (left-to-right through tuples) in our current sub-tree where
 we made a left choice. In our resulting sub-tree, we take the alternative
 (right) choice at this deepest left choice, then make left choices until we
-reach a leaf. This operation is visualized in figure~\ref{fig:sstep}; we 
-first find the deepest left choice, take the right choice at that union,
-and then pad out the choices we make until we reach a leaf.
+reach a leaf. This operation is visualized in figure~\ref{fig:sstep}. The next
+state is defined as the one where we take the right choice at the deepest left-to-right
+left choice, then complete the sub-tree with left choices. To implement this,
+we can describe the operation in two steps: stepping and padding.
 
-This intuition guides our definition of the compact-representation stepping
-function. We first identify the deepest left choice and replace it with a
-right choice (using \verb|last_left_to_right|), then pad out the remaining
-choices until we reach a leaf (using \verb|extend_list|).
+When stepping, we identify the deepest left-to-right left choice and make it
+into a right then get rid of all following choices. In the sub-tree, we do
+this by simply working through the sub-tree from bottom-to-top, right-to-left
+until we find a choice where we went left and making that into a right. The
+following choices are then dropped from the sub-tree. The result of this is
+shown as the stepped subtree in figure~\ref{fig:sstep}.
 
-The first component of stepping is identify and toggling the left-to-right
-deepest left choice that would be made for a path's equivalent sub-tree. Note
-that, because we use ``deepest'' to be top-to-bottom left-to-right, the inorder
-traversal we define over subtrees to relate them to choice lists will output the
-choices made in order of their depth. As a result, it suffices to find the last
-left choice in the list, turn it into a right choice, and truncate the list at that
-point. This is implemented in the \verb|last_left_to_right| function, as follows:
+We can define an equivalent operation over choice lists. Since choice lists
+can be constructed from a sub-tree by iterating through them depth-first left-
+to-right, the bottom-to-top right-to-left search for a left choice in the
+subtree is equivalent to finding the \emph{last} left choice in the choice
+list. This choice is turned into a right and the remainder of the list is then
+truncated.
+
+To implement this, we first reverse the choice list, replace the first left
+in the reversed list with a right choice, and then throw away the choices that
+we've encountered in the reversed list so far. We then reverse the result to
+produce the new choice list in correct order. This is implemented in the
+\verb|last_left_to_right| function, shown below.
 
 \begin{small}
 \begin{verbatim}
@@ -409,19 +436,22 @@ let last_left_to_right (l:st_choice list) =
 \end{verbatim}
 \end{small}
 
-For example, given the type $\union{\union{A}{B}}{C}$ and the choice list
-\verb+LL+, \verb|last_left_to_right| will produce the choice list \verb+LR+
-(\verb+Left+ and \verb+Right+ are shortened here with \verb+L+ and \verb+R+);
-if given \verb+LR+, it will produce \verb+R+ (as the final left choice is at
-the top-level and it truncates the remainder of the choice list).
+The stepped state is incomplete, however. The first element of the tuple has now
+changed, but the second element is no longer defined by either the sub-tree or its
+equivalent choice list. In order to define this second element, we need to complete
+the sub-tree and pad out the choice list. 
 
-However, as seen in figure~\ref{fig:sstep}, the truncation operation may produce
-an equivalent sub-tree that does not reach a leaf and is therefore not complete.
-This will happen when the children of a union in a type are not themselves leaves.
-To address this case, we then need to ``pad out'' the selected path so that it reaches
-a leaf within the type. Based on the same logic as we used for initialization, it follows
-that we should do so with all left choices. The implementation of this is in \verb|extend_list|,
-as follows
+The padding operation, taking the stepped state and producing the padded one, is determined
+by the direction of iteration. Since we go left-to-right through the type, we need to start
+any new iteration with making all left choices. Therefore, when presented by stepping with
+a partial sub-tree or choice list, we will pad it out with left choices until we have a complete
+tree or choice list.
+
+We show the padding operation for choice lists in OCaml, named
+\verb|extend_list|, below.  The correct padding is computed recursively from
+the type being iterated through by following the given choice list until it
+runs out, then adding lefts until all branches have been explored.
+
 \begin{small}
 \begin{verbatim}
   let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
@@ -448,7 +478,7 @@ type.
 \begin{small}
 \begin{verbatim}
   let rec next_state (a:typ) (ls:st_choice list) =
-    option_map fst (option_map (extend_list a) (last_left_to_right [] None ls))
+    option_map fst (option_map (extend_list a) (last_left_to_right ls))
 \end{verbatim}
 \end{small}
 
