@@ -26,21 +26,14 @@
 
 \authorrunning{B. Chung, F. Zappa Nardelli, J. Vitek}
 
-\Copyright{Anon}%Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, plea
+\Copyright{Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, plea
 \ccsdesc[500]{Theory of computation~Type theory}
 % mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
 
 \keywords{Type systems, Subtyping, Union types}
 
-\category{}%optional, e.g. invited paper
+%\hideLIPIcs
 
-\relatedversion{}%optional, e.g. full version hosted on arXiv, HAL, or other respository/website
-
-\supplement{}%optional, e.g. related research data, source code, ... hosted on a repository like zenodo, figshare, GitHub, ...
-
-\hideLIPIcs
-
-\funding{}%optional, to capture a funding statement, which applies to all authors. Please enter author specific funding statements as fifth argument of the \author macro.
 
 % jan comments 4/24/19
 % code bits are fairly wordy; see if both OCaml and Coq can be trimmed down
@@ -60,59 +53,61 @@
 %       but if there's some alternatives then cite the lot
 
 
-
-\acknowledgements{}%optional
-%\acknowledgements{Celeste Hollenbeck}
-
 %Editor-only macros:: begin (do not touch as author)%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \EventEditors{John Q. Open and Joan R. Access}
 \EventNoEds{2}
 \EventLongTitle{42nd Conference on Very Important Topics (CVIT 2016)}
-\EventShortTitle{CVIT 2016}
-\EventAcronym{CVIT}
-\EventYear{2016}
+\EventShortTitle{ECOOP}
+\EventAcronym{ECOOP}
+\EventYear{2019}
 \EventDate{December 24--27, 2016}
 \EventLocation{Little Whinging, United Kingdom}
 \EventLogo{}
 \SeriesVolume{42}
 \ArticleNo{23}
-%\nolinenumbers %uncomment to disable line numbering
-%\hideLIPIcs  %uncomment to remove references to LIPIcs series (logo, DOI, ...), e.g. when preparing a pre-final version to be uploaded to arXiv or another public repository
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
 
 \maketitle
 \begin{abstract}
-  We describe the algorithm implemented in the Julia
-  programming language runtime to decide subtyping on a simple type
-  system with union types, covariant tuples, and literals.  This
-  algorithm is immune from the space-explosion and expressiveness
-  problems of standard algorithms that normalise types into
-  disjunctive normal form ahead-of-time.  We prove this algorithm
-  correct and complete against a semantic-subtyping denotational model
-  in Coq.
+  The Julia programming language supports multiple dispatch and provides a
+  rich type annotation language to specify method applicability. When
+  multiple methods are applicable for a given call, Julia relies on
+  subtyping between method signatures to pick the method to invoke. Julia's
+  subtyping algorithm is surprisingly complex, and deciding whether it is
+  correct remains an open question. In this paper, we focus on a piece of
+  the problem, the interaction between union types and covariant
+  tuples. Previous work that addressed this particular combination of
+  features did so by normalizing types to a disjunctive normal form
+  ahead-of-time. Normalization is not practical due to space-explosion for
+  complex type signatures and to interactions with other features of Julia's
+  type system.  Our contribution is a description of the algorithm
+  implemented in the Julia run-time system. This algorithm is immune to the
+  space-explosion and expressiveness problems of standard algorithms.  We
+  prove this algorithm correct and complete against a semantic-subtyping
+  denotational model in Coq.
 \end{abstract}
 
-\section{Subtyping union types and covariant tuples}
+\section{Introduction}
 
-Union types, originally introduced by Barbanera and Dezani-
-Ciancaglini~\cite{barbanera1991intersection}, are increasingly common in
-mainstream languages. In some cases, as Julia~\cite{BezansonEKS17} or
-TypeScript~\cite{typescript}, they are exposed at the source level. In others,
-such as Hack~\cite{hack}, they are only used internally when performing type
-inference. In all cases, they play a key role in the expressiveness of the
-language.
+Union types, originally introduced by Barbanera and
+Dezani-Ciancaglini~\cite{barbanera1991intersection}, are increasingly common
+in mainstream languages. In some cases, as Julia~\cite{BezansonEKS17} or
+TypeScript~\cite{typescript}, they are exposed at the source level. In
+others, such as Hack~\cite{hack}, they are only used internally when
+performing type inference. In all cases, they play a key role in the
+expressiveness of the language.
 
 Rules for subtyping union types have been known for a long time.  Following Vouillon~\cite{Vouillon04} they may be written as:
 \begin{mathpar}
-\inferrule{t_1 \sub t \\ t_2 \sub t}{\union{t_1}{t_2} \sub t}
+\inferrule{t' \sub t \\ t'' \sub t}{\union{t'}{t''} \sub t}
 
 \quad
 
-\inferrule{t \sub t_1}{t \sub \union{t_1}{t_2}}
+\inferrule{t \sub t'}{t \sub \union{t'}{t''}}
 
-\inferrule{t \sub t_2}{t \sub \union{t_1}{t_2}}
+\inferrule{t \sub t''}{t \sub \union{t'}{t''}}
 \end{mathpar}
 These rules are asymmetrical. Following from set-theoretic intuitions,
 and as made formal by semantic subtyping models, when a union type
@@ -258,7 +253,7 @@ of their approach.
 %% concequence, variable instantiations may be over-specialized and some
 %% semantically-valid subtyping relations may not hold.
 
-In this \emph{pearl paper} we describe the keys ideas used by the
+In this paper we describe the keys ideas used by the
 subtype algorithm implemented in the Julia language to deal with
 union types and covariant tuples, and we will argue that these avoid the
 two drawbacks above.  To avoid being drawn in the vast complexity of
