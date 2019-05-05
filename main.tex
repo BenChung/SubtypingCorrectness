@@ -326,14 +326,14 @@ Our space efficient representation stores choices that are made along a
 pre-order depth-first traversal of the iterated type tree. We can then
 manipulate this representation directly, avoiding the construction or
 storage of tree-structured iterators. The choices are stored as lists of
-\verb|st_choice|s which indicate which branch of a union type was taken:
+\verb|choice|s which indicate which branch of a union type was taken:
 
 \begin{lstlisting}
-  type st_choice = Left | Right
+  type choice = Left | Right
 \end{lstlisting}
 
 
-Lists of \verb|st_choice|s are isomorphic to the sub-tree representation when
+Lists of \verb|choice|s are isomorphic to the sub-tree representation when
 combined with the type being iterated over. To convert from sub-trees  to
 choice lists we simply conduct a preorder traversal of the sub-tree recording
 which choices were made along the way. Going from choice lists to sub-trees can
@@ -345,11 +345,11 @@ initialize it with the state that takes the left choice at every union:
 
 
 \begin{lstlisting}
-let rec initial_choice (a:typ) = 
+let rec initial(a:typ) = 
   match a with
   | Atom i -> []
-  | Tuple(t1,t2) -> (initial_choice t1) @ (initial_choice t2)
-  | Union(l,r) -> Left::(initial_choice l)
+  | Tuple(t1,t2) -> (initial t1) @ (initial t2)
+  | Union(l,r) -> Left::(initial l)
 \end{lstlisting}
 
 
@@ -399,13 +399,13 @@ produce the new choice list in correct order. This is implemented in the
 
 
 \begin{lstlisting}
-let rec toggle_truncate = function
+let rec toggle = function
   | [] -> []    
   | Left::tl -> Right::tl
-  | Right::tl -> toggle_truncate tl
+  | Right::tl -> toggle tl
 
-let last_left_to_right (l:st_choice list) =
-  match List.rev (toggle_truncate (List.rev l)) with
+let last_left_to_right (l:choice list) =
+  match List.rev (toggle(List.rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
 \end{lstlisting}
@@ -423,35 +423,35 @@ a partial sub-tree or choice list, we will pad it out with left choices until we
 tree or choice list.
 
 We show the padding operation for choice lists in OCaml, named
-\verb|extend_list|, below.  The correct padding is computed recursively from
+\verb|pad|, below.  The correct padding is computed recursively from
 the type being iterated through by following the given choice list until it
 runs out, then adding lefts until all branches have been explored.
 
 \begin{lstlisting}
-let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
+let rec pad(a:typ)(ls:choice list) = match (a,ls) with
  | (Atom i,_) -> ([],ls)
- | (Tuple(t1,t2) _) -> let (hd,tl) = extend_list t1 ls in
-                        let (hd2,tl2) = extend_list t2 tl in
+ | (Tuple(t1,t2) _) -> let (hd,tl) = pad t1 ls in
+                        let (hd2,tl2) = pad t2 tl in
                         (hd @ hd2,tl2)
- | (Union(l,r),Left::rs) -> let (hd,tl) = extend_list l rs in (Left::hd,tl)
- | (Union(l,r),Right::rs) -> let (hd,tl) = extend_list r rs in (Right::hd,tl)
- | (Union(l,r),[]) -> (Left::initial_choice l,[])
+ | (Union(l,r),Left::rs) -> let (hd,tl) = pad l rs in (Left::hd,tl)
+ | (Union(l,r),Right::rs) -> let (hd,tl) = pad r rs in (Right::hd,tl)
+ | (Union(l,r),[]) -> (Left::initial l,[])
 \end{lstlisting}
 
 
-Finally, the \verb|next_state| function combines these operations into
+Finally, the \verb|next| function combines these operations into
 a single step operation. It will take the deepest alternative choice
 at a union using \verb|last_left_to_right|, then add however many left
-choices are required to make the path valid using \verb|extend_list|. The
-complete \verb|next_state| operation shown in figure~\ref{fig:sstep} takes
+choices are required to make the path valid using \verb|pad|. The
+complete \verb|next| operation shown in figure~\ref{fig:sstep} takes
 the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
 choice stack RL. To do so, it takes the left choice, converts it to a right,
 then pads the list out with lefts until the path is valid with respect to the 
 type.
 
 \begin{lstlisting}
-let rec next_state (a:typ) (ls:st_choice list) =
-  option_map fst (option_map (extend_list a) (last_left_to_right ls))
+let rec next(a:typ)(ls:choice list) =
+  option_map fst (option_map (pad a) (last_left_to_right ls))
 \end{lstlisting}
 
 
@@ -505,17 +505,17 @@ given instantiations of the left and right hand types, then describe the
 algorithm that iterates through those types.
 
 \begin{lstlisting}
-type st_res =
- | Subtype of st_choice list * st_choice list
+type res =
+ | Subtype of choice list * choice list
  | NotSubtype
 \end{lstlisting}
 
-The type \verb|st_res| represents the results of a single base subtype query. The query
+The type \verb|res| represents the results of a single base subtype query. The query
 can either succeed, in which case it provides the unused portion of the input
 stacks, or fail. 
 
 \begin{lstlisting}
-let rec base_subtype(a:typ)(b:typ)(fa:st_choice list)(ex:st_choice list)
+let rec base_subtype(a:typ)(b:typ)(fa:choice list)(ex:choice list)
  match (a,b,fa,ex) with
  | (Atom i,Atom j,_,_) -> if i==j then Subtype(fa,ex) else NotSubtype
  | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
@@ -536,7 +536,7 @@ to those paths. Given a basic type---an atom or a tuple---it will
 either check equality or recur respectively. Given a union type, it
 will choose the component of the union type following the choice
 stacks and continue recursively. The function then returns an instance
-of \verb|st_res|, which gives the remaining choice stacks if
+of \verb|res|, which gives the remaining choice stacks if
 successful or nothing otherwise.
 
 
@@ -546,52 +546,52 @@ of the left there exists an instantiation of the right hand side of the
 subtyping judgment such that the subtype relation holds. To check this,
 we use a simple brute force approach sitting atop the choice stack iterator
 infrastructure described previously. The algorithm is implemented in two
-functions. \verb|ex_subtype| checks that there exists an instantiation
-of the right-hand-side for a given left-hand-side. \verb|fa_ex_subtype|
-uses \verb|ex_subtype| to check that for every instantiation of the LHS,
+functions. \verb|exists| checks that there exists an instantiation
+of the right-hand-side for a given left-hand-side. \verb|allexists|
+uses \verb|exists| to check that for every instantiation of the LHS,
 there is an instantiation of the RHS such that the subtype relation
 holds. 
 
 
 \begin{lstlisting}
-let rec ex_subtype(a:typ)(b:typ)(fa:st_choice list)(cex:st_choice list) =
+let rec exists(a:typ)(b:typ)(fa:choice list)(cex:choice list) =
   match base_subtype a b fa cex with 
   | Subtype(_,_) -> true 
   | NotSubtype -> 
-     (match next_state b cex with
-      | Some ns -> ex_subtype a b fa ns 
+     (match next b cex with
+      | Some ns -> exists a b fa ns 
       | None -> false) 
 \end{lstlisting}
 
 If the current choice---given by \verb|cex|---is a supertype of the given
-\verb|a| according to \verb|base_subtype|, then \verb|ex_subtype| has found
+\verb|a| according to \verb|base_subtype|, then \verb|exists| has found
 a valid instantiation of \verb|b|. Therefore, there exists an instantiation
 of \verb|b| that is a supertype of \verb|a| and the result should be true.
-Otherwise, \verb|ex_subtype| will use the iteration operation,
-\verb|next_state|, to continue iterating through choices for \verb|b| until
+Otherwise, \verb|exists| will use the iteration operation,
+\verb|next|, to continue iterating through choices for \verb|b| until
 it either finds an instantiation that is a supertype or runs out of
 instantiations.
 
  \begin{lstlisting}
-let rec fa_ex_subtype (a:typ)(b:typ)(cfa:st_choice list) =
-  match ex_subtype a b cfa (initial_choice b) with 
-  | true -> (match next_state a cfa with
-             | Some ns -> fa_ex_subtype a b ns 
+let rec allexists(a:typ)(b:typ)(cfa:choice list) =
+  match exists a b cfa (initial b) with 
+  | true -> (match next a cfa with
+             | Some ns -> allexists a b ns 
              | None -> true) 
   | false -> false
 \end{lstlisting}
 
-The function \verb|fa_ex_subtype| is similar; it checks that for every
+The function \verb|allexists| is similar; it checks that for every
 instantiation of \verb|a|, there exists an instantiation of 
 \verb|b| such that subtyping holds. Checking for an instantiation
-of \verb|b| is done using \verb|ex_subtype|, while \verb|fa_ex_subtype|
+of \verb|b| is done using \verb|exists|, while \verb|allexistits|
 maintains an iterator for \verb|a|.
 
-The operation of \verb|fa_ex_subtype| and \verb|ex_subtype| as well as their
+The operation of \verb|allexists| and \verb|exists| as well as their
 calls to \verb|base_subtype| can be seen in figure~\ref{fig:cfs}. In the
-$\forall$ column, we see the current state maintained by \verb|fa_ex_subtype|.
-The $\exists$ column shows the state maintained by \verb|ex_subtype| as it is
-called by \verb|fa_ex_subtype|. In the example, for a forall-list of L, we an
+$\forall$ column, we see the current state maintained by \verb|allexists|.
+The $\exists$ column shows the state maintained by \verb|exists| as it is
+called by \verb|allexists|. In the example, for a forall-list of L, we an
 find an exists-list of L such that \verb|base_subtype| holds. Similarly,
 for a forall-list of R, we can find an exists-list instantiation of R such
 that subtyping holds. Therefore, for every instantaition of the left-hand-side,
@@ -599,11 +599,11 @@ there exists an instantiation of the right-hand-side such that subtyping holds
 and subtyping holds for the type as a whole.
 
 \begin{lstlisting}
-let subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
+let subtype (a:typ) (b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
 Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
-It seeds \verb|fa_ex_subtype| with the initial choice for \verb|a|'s
+It seeds \verb|allexists| with the initial choice for \verb|a|'s
 iterator, which then checks if for every instantiation of \verb|a|
 there exists an instantiation of \verb|b| such that subtyping holds.
 
@@ -701,24 +701,24 @@ Fixpoint start_iterator (t:type):TypeIterator t :=
 to the next state or indicates that no such next state exists.
 
 \begin{small}\begin{verbatim}
-Fixpoint next_state (t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
+Fixpoint next(t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
   match ti with
   | TIAtom i => None
   | TITuple ti1 ti2 p1 p2 =>
-    match (next_state ti2 p2) with
+    match (next ti2 p2) with
     | Some np2 => Some(TITuple ti1 ti2 p1 np2)
     | None =>
-      match (next_state ti1 p1) with
+      match (next ti1 p1) with
       | Some np1 => Some(TITuple ti1 ti2 np1 (start_iterator ti2))
       | None => None
       end
     end
   | TIUnionL ti1 ti2 pl =>
-    match (next_state ti1 pl) with
+    match (next ti1 pl) with
     | Some npl => Some(TIUnionL ti1 ti2 npl)
     | None => Some(TIUnionR ti1 ti2 (start_iterator ti2))
     end
-  | TIUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next_state ti2 pr)
+  | TIUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next ti2 pr)
   end.
 \end{verbatim}\end{small}
 
@@ -743,18 +743,18 @@ the next element produced by the iterator from the tuple.
 See \verb|iterator_has_clauses| in the Coq proof for full details.
 \end{proof}
 
-\verb|next_state| returns \verb|Some s| if there is some successor state
+\verb|next| returns \verb|Some s| if there is some successor state
 \verb|s| to the current, and \verb|None| if the given iterator state is
 terminal. It will go left-to-right through unions, and will explore 2-tuples
 by iterating through the choices on the right for each choice on the left. We can
-then define an induction principle for type iterators based on \verb|next_state|:
+then define an induction principle for type iterators based on \verb|next|:
 
 \begin{theorem}
 \begin{small}\begin{verbatim}
 Definition iter_rect
   (t:type) (P:TypeIterator t -> Set)
-           (pi: forall it, next_state t it = None -> P it)
-           (ps : forall it' it'', P it'' -> next_state t it' = Some it'' -> P it')
+           (pi: forall it, next t it = None -> P it)
+           (ps : forall it' it'', P it'' -> next t it' = Some it'' -> P it')
            (it : TypeIterator t) : P it  
 \end{verbatim}\end{small}
 
@@ -783,7 +783,7 @@ For full details, see the Coq definition of \verb|iter_rect|.
 \end{proof}
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
-to \verb|ex_subtype|, \verb|fa_ex_subtype|, and \verb|subtype| as described in the
+to \verb|exists|, \verb|allexists|, and \verb|subtype| as described in the
 OCaml implementation.
 
 \begin{small}\begin{verbatim}
@@ -792,10 +792,10 @@ Definition exists_iter(a b : type) :
    {forall t, InType t b -> ~(BaseSubtype a t) }).
 \end{verbatim}\end{small}
 
-\verb|exists_iter| is equivalent to the choice-stack based \verb|ex_subtype|,
+\verb|exists_iter| is equivalent to the choice-stack based \verb|exists|,
 and determines if there exists some denotationally-contained type in \verb|b|
 that is a supertype of the given \verb|a|. Internally, it is implemented in 
-the same way as \verb|ex_subtype|, though using \verb|iter_rect| to iterate 
+the same way as \verb|exists|, though using \verb|iter_rect| to iterate 
 through every iterator state.
 
 \begin{small}\begin{verbatim}
@@ -804,9 +804,9 @@ Definition forall_iter (a b : type) :
   { exists t, In t (clauses a) /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
 \end{verbatim}\end{small}
 
-\verb|forall_iter| is to \verb|fa_ex_subtype| what \verb|exists_iter| is to
-\verb|ex_subtype|. Like \verb|exists_iter| it implements the same decision procedure
-as \verb|fa_ex_subtype| (and internally relies upon \verb|exists_iter|), though through
+\verb|forall_iter| is to \verb|allexists| what \verb|exists_iter| is to
+\verb|exists|. Like \verb|exists_iter| it implements the same decision procedure
+as \verb|allexists| (and internally relies upon \verb|exists_iter|), though through
 the abstraction of \verb|iter_rect|.
 
 Finally, we can define a decidable function (called \verb|subtype| in the proof)
@@ -907,13 +907,13 @@ See \verb|itp_correct| in the Coq proof.
 Stepping in the Coq implementation is implemented identically to the OCaml
 implementation. It only remains to show that this step operation (called
 \verb|step_ctx| in Coq) is correct with respect to the iterator
-\verb|next_state|.
+\verb|next|.
 
 \begin{lemma}[Correctness of step\_ctx]
 \begin{small}\begin{verbatim}
 forall t it,
     step_ctx t (iterator_to_path t it) =
-    (option_map (iterator_to_path t) (next_state t it)).
+    (option_map (iterator_to_path t) (next t it)).
 \end{verbatim}\end{small}
 For every type \verb|t| and type iterator \verb|it|,
 stepping the choice-list equivalent of \verb|it| will
@@ -925,7 +925,7 @@ See \verb|list_step_correct| in the Coq proof.
 \end{proof}
 
 Now, with the relevant properties proven, we can implement and prove correct
-\verb|ex_subtype| and \verb|fa_ex_subtype| in Coq. The function names are the
+\verb|exists| and \verb|allexists| in Coq. The function names are the
 same, as are the implementations up to the addition of a fuel parameter (which
 is shown to be unnecessary). 
 
@@ -933,12 +933,12 @@ is shown to be unnecessary).
 \begin{small}\begin{verbatim}
 forall a b it, 
   (exists pf, exists_iter_inner a b it = inleft pf) <->
-   exists n, ex_subtype a b (iterator_to_path b it) n = Some true.
+   exists n, exists a b (iterator_to_path b it) n = Some true.
 \end{verbatim}\end{small}
 For every two types \verb|a| and \verb|b|, the iterator-based algorithm
 \verb|exists_iter_inner| will produce a proof that \verb|a| is a subtype
 of \verb|b| if and only if there is an integer \verb|n| such that
- \verb|ex_subtype| given \verb|n| fuel runs producing true.
+ \verb|exists| given \verb|n| fuel runs producing true.
 \end{lemma}
 \begin{proof}
 See \verb|ex_sub_corr_eq| in the Coq proof.
@@ -948,13 +948,13 @@ See \verb|ex_sub_corr_eq| in the Coq proof.
 \begin{small}\begin{verbatim}
 forall a b it,
    (exists pf, forall_iter_inner a b it = left pf) <->
-    exists n, fa_ex_subtype a b (iterator_to_path a it) n = Some true.
+    exists n, allexists a b (iterator_to_path a it) n = Some true.
 \end{verbatim}
 \end{small}  
 For every two types \verb|a| and \verb|b|, the iterator-based algorithm
 \verb|forall_iter_inner| will produce a proof that \verb|a| is a subtype
 of \verb|b| if and only if there is an integer \verb|n| such that
- \verb|fa_ex_subtype| given \verb|n| fuel runs producing true.
+ \verb|allexists| given \verb|n| fuel runs producing true.
 \end{lemma}
 \begin{proof}
 See \verb|fa_sub_corr_eq| in the Coq proof.
