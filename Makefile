@@ -3,6 +3,11 @@ all: figures fast
 fast:
 	pdflatex main
 
+jan:
+	pdflatex main
+	bibtex main
+	open main.pdf
+
 slow:
 	pdflatex main
 	biblatex main
