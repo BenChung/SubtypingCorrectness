@@ -44,24 +44,6 @@
  breaklines=true,
  showstringspaces=false}
 
-% jan comments 4/24/19
-% code bits are fairly wordy; see if both OCaml and Coq can be trimmed down
-% how clear are the code bits? 
-% clarify last_left_to_right; do with a fold? <- attempted fix
-% better motivate this in the intro
-%    bit of julia? <- attempted fix
-%    other features that make this important to solve? <- attempted fix
-%    intro should be longer and take more time
-% talks about semantic subtyping as if it's a fact, but doesn't explain what it is or why we should care <- attempted fix
-% figures
-%   haven't spent enough time looking at them
-%   may not help
-% references
-%    subtyping cites
-%       if there's one that's subsuming others then cite that
-%       but if there's some alternatives then cite the lot
-
-
 %Editor-only macros:: begin (do not touch as author)%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \EventEditors{John Q. Open and Joan R. Access}
 \EventNoEds{2}
@@ -395,7 +377,7 @@ To implement this, we first reverse the choice list, replace the first left
 in the reversed list with a right choice, and then throw away the choices that
 we've encountered in the reversed list so far. We then reverse the result to
 produce the new choice list in correct order. This is implemented in the
-\verb|last_left_to_right| function, shown below.
+\verb|last| function, shown below.
 
 
 \begin{lstlisting}
@@ -404,7 +386,7 @@ let rec toggle = function
   | Left::tl -> Right::tl
   | Right::tl -> toggle tl
 
-let last_left_to_right (l:choice list) =
+let last(l:choice list) =
   match List.rev (toggle(List.rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
@@ -428,7 +410,7 @@ the type being iterated through by following the given choice list until it
 runs out, then adding lefts until all branches have been explored.
 
 \begin{lstlisting}
-let rec pad(a:typ)(ls:choice list) = match (a,ls) with
+let rec pad(a:typ)(l:choice list) = match (a,ls) with
  | (Atom i,_) -> ([],ls)
  | (Tuple(t1,t2) _) -> let (hd,tl) = pad t1 ls in
                         let (hd2,tl2) = pad t2 tl in
@@ -441,7 +423,7 @@ let rec pad(a:typ)(ls:choice list) = match (a,ls) with
 
 Finally, the \verb|next| function combines these operations into
 a single step operation. It will take the deepest alternative choice
-at a union using \verb|last_left_to_right|, then add however many left
+at a union using \verb|last|, then add however many left
 choices are required to make the path valid using \verb|pad|. The
 complete \verb|next| operation shown in figure~\ref{fig:sstep} takes
 the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
@@ -450,8 +432,8 @@ then pads the list out with lefts until the path is valid with respect to the
 type.
 
 \begin{lstlisting}
-let rec next(a:typ)(ls:choice list) =
-  option_map fst (option_map (pad a) (last_left_to_right ls))
+let rec next(a:typ)(l:choice list) =
+  option_map fst (option_map (pad a) (last ls)
 \end{lstlisting}
 
 
@@ -497,39 +479,40 @@ Figure~\ref{fig:cfs} shows our algorithm's internal state when using  both the
 structural and space- efficient representations when deciding subtyping for
 this type.
 
-The algorithm proceeds by maintaining two iterators (one for each side of the subtyping judgment) over choices-at-unions,  
-checking that for every instantiation of the left hand type there
-exists an instantiation of the right hand type. We will first define the
-fundamental subtyping relation, used to decide subtyping relationships when
-given instantiations of the left and right hand types, then describe the
-algorithm that iterates through those types.
+The algorithm proceeds by maintaining two iterators (one for each side of
+the subtyping judgment) over choices-at-unions, checking that for every
+instantiation of the left hand type there exists an instantiation of the
+right hand type. We will first define the fundamental subtyping relation,
+used to decide subtyping relationships when given instantiations of the left
+and right hand types, then describe the algorithm that iterates through
+those types.
 
 \begin{lstlisting}
 type res =
- | Subtype of choice list * choice list
- | NotSubtype
+ | IsSub of choice list * choice list
+ | NotSub
 \end{lstlisting}
 
-The type \verb|res| represents the results of a single base subtype query. The query
-can either succeed, in which case it provides the unused portion of the input
-stacks, or fail. 
+The type \verb|res| represents the results of a single base subtype
+query. The query can either succeed, in which case it provides the unused
+portion of the input stacks, or fail.
 
 \begin{lstlisting}
-let rec base_subtype(a:typ)(b:typ)(fa:choice list)(ex:choice list)
- match (a,b,fa,ex) with
- | (Atom i,Atom j,_,_) -> if i==j then Subtype(fa,ex) else NotSubtype
+let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
+ match (a,b,f,e) with
+ | (Atom i,Atom j,_,_) -> if i==j then IsSub(f,e) else NotSub
  | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
-    (match base_subtype ta1 tb1 fa ex with
-     | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
-     | NotSubtype -> NotSubtype)
- | (Union(a1,a2),b,choice::fa,ex) -> 
-       base_subtype (match choice with Left->a1 | Right->a2) b fa ex
- | (a,Union(b1,b2),fa,choice::ex) -> 
-       base_subtype a (match choice with Left->b1 | Right->b2) fa ex
+    (match sub ta1 tb1 f e with
+     | IsSub(cfa, cex) -> sub ta2 tb2 cfa cex
+     | NotSub -> NotSub)
+ | (Union(a1,a2),b,choice::f,e) -> 
+       sub (match choice with Left->a1 | Right->a2) b f e
+ | (a,Union(b1,b2),f,choice::e) -> 
+       sub a (match choice with Left->b1 | Right->b2) f e
 \end{lstlisting}
 
 
-The function \verb|base_subtype| is responsible for using two
+The function \verb|sub| is responsible for using two
 paths---one for the left and right hand sides of the subtyping
 relation---and checking that the subtype relation holds with respect
 to those paths. Given a basic type---an atom or a tuple---it will
@@ -554,17 +537,17 @@ holds.
 
 
 \begin{lstlisting}
-let rec exists(a:typ)(b:typ)(fa:choice list)(cex:choice list) =
-  match base_subtype a b fa cex with 
-  | Subtype(_,_) -> true 
-  | NotSubtype -> 
-     (match next b cex with
-      | Some ns -> exists a b fa ns 
+let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
+ sub a b f e with 
+  | IsSub(_,_) -> true 
+  | NotSub -> 
+     (match next b e with
+      | Some ns -> exists a b f ns 
       | None -> false) 
 \end{lstlisting}
 
-If the current choice---given by \verb|cex|---is a supertype of the given
-\verb|a| according to \verb|base_subtype|, then \verb|exists| has found
+If the current choice---given by \verb|e|---is a supertype of the given
+\verb|a| according to \verb|sub|, then \verb|exists| has found
 a valid instantiation of \verb|b|. Therefore, there exists an instantiation
 of \verb|b| that is a supertype of \verb|a| and the result should be true.
 Otherwise, \verb|exists| will use the iteration operation,
@@ -573,9 +556,9 @@ it either finds an instantiation that is a supertype or runs out of
 instantiations.
 
  \begin{lstlisting}
-let rec allexists(a:typ)(b:typ)(cfa:choice list) =
-  match exists a b cfa (initial b) with 
-  | true -> (match next a cfa with
+let rec allexists(a:typ)(b:typ)(f:choice list) =
+  match exists a b f (initial b) with 
+  | true -> (match next a f with
              | Some ns -> allexists a b ns 
              | None -> true) 
   | false -> false
@@ -588,18 +571,18 @@ of \verb|b| is done using \verb|exists|, while \verb|allexistits|
 maintains an iterator for \verb|a|.
 
 The operation of \verb|allexists| and \verb|exists| as well as their
-calls to \verb|base_subtype| can be seen in figure~\ref{fig:cfs}. In the
+calls to \verb|sub| can be seen in figure~\ref{fig:cfs}. In the
 $\forall$ column, we see the current state maintained by \verb|allexists|.
 The $\exists$ column shows the state maintained by \verb|exists| as it is
 called by \verb|allexists|. In the example, for a forall-list of L, we an
-find an exists-list of L such that \verb|base_subtype| holds. Similarly,
+find an exists-list of L such that \verb|sub| holds. Similarly,
 for a forall-list of R, we can find an exists-list instantiation of R such
 that subtyping holds. Therefore, for every instantaition of the left-hand-side,
 there exists an instantiation of the right-hand-side such that subtyping holds
 and subtyping holds for the type as a whole.
 
 \begin{lstlisting}
-let subtype (a:typ) (b:typ) = allexists a b (initial a)
+let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
 Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
