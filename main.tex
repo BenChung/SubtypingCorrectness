@@ -115,12 +115,12 @@ range is multiplied by a number and generic numeric multiplication. The
 third method invokes native multiplication when both arguments are either
 signed or unsinged integers (but not a mix of signed and unsigned).
 
-Method signatures in Julia can be quite complicated, complicating subtyping.
-Julia offers programmers a rich type language, including nominal single
-subtyping, union types, existential types, covariant tuples, invariant
+Method signatures in Julia can be quite complicated, making subtyping
+difficult. Julia offers programmers a rich type language, including nominal
+single subtyping, union types, existential types, covariant tuples, invariant
 parametric datatypes, and singleton types. These features are widely used in
-libraries, but make development of a subtyping algorithm complicated. The main
-source of inspiration for the design of subtyping in Julia was semantic
+libraries, but pose challenges for subtyping. The main source of inspiration
+for the design of subtyping in Julia was semantic
 subtyping~\cite{Frisch02,BezansonEKS17}, but the final design departs from
 that intuitive understanding of types.
 
