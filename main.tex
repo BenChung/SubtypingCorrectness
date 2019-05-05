@@ -260,7 +260,7 @@ by iterating through choices made at unions along paths complete through the
 two types In this section, we will describe the implementation of the
 algorithm in OCaml and will present our proof of correctness in Coq in the
 following section.  We focus on a core type language composed of binary
-unions, covariant binary tuples, and atom types:
+unions, covariant binary tuples, and primitive types:
 
 \begin{lstlisting}
 type typ =
@@ -515,7 +515,7 @@ let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
 The function \verb|sub| is responsible for using two
 paths---one for the left and right hand sides of the subtyping
 relation---and checking that the subtype relation holds with respect
-to those paths. Given a basic type---an atom or a tuple---it will
+to those paths. Given a basic type---an primitive or a tuple---it will
 either check equality or recur respectively. Given a union type, it
 will choose the component of the union type following the choice
 stacks and continue recursively. The function then returns an instance
