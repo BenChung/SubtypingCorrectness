@@ -85,11 +85,10 @@
 Union types, originally introduced by Barbanera and Dezani-
 Ciancaglini~\cite{barbanera1991intersection}, are increasingly being used in
 mainstream languages. In some cases, as Julia~\cite{BezansonEKS17} or
-TypeScript~\cite{typescript}, they are exposed at the source level. In others,
-such as Hack~\cite{hack}, they are only used internally when performing type
-inference. We describe a space-efficient technique for computing subtyping between 
-types in the presence of distributive unions.
-
+TypeScript~\cite{typescript}, they are exposed at the source level. In
+others, such as Hack~\cite{hack}, they are only used internally when
+performing type inference. We describe a space-efficient technique for
+computing subtyping between types in the presence of distributive unions.
 Our motivation arises from the Julia programming language. In our previous
 work on formalizing the Julia subtyping algorithm~\cite{DBLP:NardelliBPCBV18},
 we succinctly summarized the subtyping relation but were unable to describe
@@ -115,12 +114,12 @@ range is multiplied by a number and generic numeric multiplication. The
 third method invokes native multiplication when both arguments are either
 signed or unsinged integers (but not a mix of signed and unsigned).
 
-Method signatures in Julia can be quite complicated, making subtyping
+Method signatures in Julia can be quite complex, making subtyping
 difficult. Julia offers programmers a rich type language, including nominal
-single subtyping, union types, existential types, covariant tuples, invariant
-parametric datatypes, and singleton types. These features are widely used in
-libraries, but pose challenges for subtyping. The main source of inspiration
-for the design of subtyping in Julia was semantic
+single subtyping, union types, existential types, covariant tuples,
+invariant parametric datatypes, and singleton types. These features are
+widely used in libraries, but pose challenges for subtyping. The main source
+of inspiration for the design of subtyping in Julia was semantic
 subtyping~\cite{Frisch02,BezansonEKS17}, but the final design departs from
 that intuitive understanding of types.
 
@@ -147,10 +146,8 @@ deductive system:
 \end{mathpar}}
 \vspace{-3mm}
 
-\noindent While this rule system makes sense, it has some surprising
-properties. 
-
-The above rule system does not match the intuition for subtyping. If we think
+\noindent While this rule system makes sense, it has a  surprising
+property: it  does not match the intuition for subtyping. If we think
 of types as sets of values, as made formal by semantic
 subtyping~\cite{Pierce1991}, we would expect that a union type would be
 analogous to a set theoretic union. Similarly, we would then expect that two
@@ -263,15 +260,12 @@ respect to a standard semantic subtyping model.
 
 \section{A space-efficient subtyping algorithm}
 
-The greatest difficulty of subtyping union types is searching the entire
-space of possible forall/exist quantifications of union types. We have seen
-that syntax-directed rules need ahead-of-time normalisation in the presence
-of covariant tuples.  The algorithm we propose for deciding subtyping works
-by iterating through choices made at unions along paths complete through the
-two types In this section, we will describe the implementation of the
-algorithm in OCaml and will present our proof of correctness in Coq in the
-following section.  We focus on a core type language composed of binary
-unions, covariant binary tuples, and primitive types:
+This section presents a simplified version of Julia's subtype algorithm.  To
+better align with our Coq proof, the algorithm is implemented in Ocaml.  For
+clarity, we omit some optimizations (they are discussed at the end of the
+sections).
+We focus on a core type language composed of binary unions, covariant binary
+tuples, and primitive types:
 
 \begin{lstlisting}
 type typ =
@@ -280,11 +274,84 @@ type typ =
  | Union of typ * typ
 \end{lstlisting}
 
-Prim types are singletons with respect to subtyping, and are ranged
-over by
-\(A, B, ...\).  Abusing the
-notation, we will assume that we also have unary
-tuples; these can be easily encoded. 
+Prim types are singletons with respect to subtyping, and are ranged over by
+\(t_1, ... t_n\).
+
+\subsection{Overview}
+
+Consider the following query:
+
+\[
+\union{ \tuple{t_1,t_2}}{\tuple{t_3,t_2}}  <:  \tuple{ \union{t_3}{t_1}, \union{t_1}{t_2}}
+\]
+
+
+If we normalize it we would get a left hand side that is the union of the
+following two tuples:
+
+\[
+1: \tuple{t_1,t_2}, \quad
+2: \tuple{t_3,t_2}
+\]
+
+
+The right hand side normalizes to the union of the following four tuples:
+
+\[
+1: \tuple{t_3,t_1}, \quad
+2: \tuple{t_3,t_2}
+3: \tuple{t_1,t_1}, \quad
+4: \tuple{t_1,t_2}
+\]
+
+
+Subtyping can be defined with two helper functions, allexists, which
+iterates through every left-hand side tuple and checks that for each
+one, the second function, exists, finds at least one matching tuple
+on the right hand side.
+
+Each of these function takes as state a position in the sequences
+of tuples.
+
+The intuition is that instead of materializing those sequences of tuples
+which would requires exponential space, we will iterate through that
+space by walking over the abstract syntax trees of  type terms.
+
+The state of the iterators is the encoding of position in the tree
+that remembers all of the choice points, i.e. all of the unions that
+were encountered.
+
+Consider
+
+ tuple union t3 t1 union t1 t2
+
+This gives the following tree
+
+      tuple
+
+ union     union
+
+t3  t1     t1 t2
+
+
+Position 1 in the normalized sequence can be encoded  as LL,
+position 2 is LR, 3 is RL and 4 is RR.
+
+Each letter in the string represents one choice point.
+
+
+
+
+\subsection{Unchanged.}
+The greatest difficulty of subtyping union types is searching the entire
+space of possible forall/exist quantifications of union types. We have seen
+that syntax-directed rules need ahead-of-time normalisation in the presence
+of covariant tuples.  The algorithm we propose for deciding subtyping works
+by iterating through choices made at unions along paths complete through the
+two types In this section, we will describe the implementation of the
+algorithm in OCaml and will present our proof of correctness in Coq in the
+following section. 
+
 
 We will begin by discussing a version of our algorithm that uses structurally-
 dependent iterators to explore types, then use that basis to describe our
@@ -446,7 +513,7 @@ type.
 
 \begin{lstlisting}
 let rec next(a:typ)(l:choice list) =
-  option_map fst (option_map (pad a) (last ls))
+  option_map fst (option_map (pad a) (last l))
 \end{lstlisting}
 
 \subsection{Subtyping}
@@ -514,12 +581,12 @@ let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
  | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
  | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
     (match sub ta1 tb1 f e with
-     | IsSub(cfa, cex) -> sub ta2 tb2 cfa cex
+     | IsSub(f', e') -> sub ta2 tb2 f' e'
      | NotSub -> NotSub)
- | (Union(a1,a2),b,dir::f,e) -> 
-       sub (match choice with Left->a1 | Right->a2) b f e
- | (a,Union(b1,b2),f,dir::e) -> 
-       sub a (match choice with Left->b1 | Right->b2) f e
+ | (Union(a1,a2),b,d::f',e) -> 
+       sub (match d with Left->a1 | Right->a2) b f' e
+ | (a,Union(b1,b2),f,d::e') -> 
+       sub a (match d with Left->b1 | Right->b2) f e'
 \end{lstlisting}
 
 
@@ -597,6 +664,8 @@ Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
 It seeds \verb|allexists| with the initial choice for \verb|a|'s
 iterator, which then checks if for every instantiation of \verb|a|
 there exists an instantiation of \verb|b| such that subtyping holds.
+
+\subsection{Further optimizations}
 
 We have presented our subtyping algorithm using lists of choices. In a
 practical implementation, however, these lists of choices can be efficiently
