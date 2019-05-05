@@ -264,12 +264,12 @@ unions, covariant binary tuples, and atom types:
 
 \begin{lstlisting}
 type typ =
- | Atom of int
+ | Prim of int
  | Tuple of typ * typ
  | Union of typ * typ
 \end{lstlisting}
 
-Atom types are singletons with respect to subtyping, and are ranged
+Prim types are singletons with respect to subtyping, and are ranged
 over by
 \(A, B, ...\).  Abusing the
 notation, we will assume that we also have unary
@@ -331,7 +331,7 @@ initialize it with the state that takes the left choice at every union:
 \begin{lstlisting}
 let rec initial(a:typ) = 
   match a with
-  | Atom i -> []
+  | Prim i -> []
   | Tuple(t1,t2) -> (initial t1) @ (initial t2)
   | Union(l,r) -> Left::(initial l)
 \end{lstlisting}
@@ -413,7 +413,7 @@ runs out, then adding lefts until all branches have been explored.
 
 \begin{lstlisting}
 let rec pad(a:typ)(l:choice list) = match (a,ls) with
- | (Atom i,_) -> ([],ls)
+ | (Prim i,_) -> ([],ls)
  | (Tuple(t1,t2) _) -> let (hd,tl) = pad t1 ls in
                         let (hd2,tl2) = pad t2 tl in
                         (hd @ hd2,tl2)
@@ -500,7 +500,7 @@ portion of the input stacks, or fail.
 \begin{lstlisting}
 let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
  match (a,b,f,e) with
- | (Atom i,Atom j,_,_) -> if i==j then IsSub(f,e) else NotSub
+ | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
  | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
     (match sub ta1 tb1 f e with
      | IsSub(cfa, cex) -> sub ta2 tb2 cfa cex
@@ -641,7 +641,7 @@ However, it retains type structure information inside of the iterator state.
 
 \begin{small}\begin{verbatim}
 Inductive TypeIterator: type -> Set :=
-| TIAtom : forall i, TypeIterator (atom i)
+| TIPrim : forall i, TypeIterator (atom i)
 | TITuple : forall t1 t2, TypeIterator t1 -> TypeIterator t2 -> TypeIterator (tuple t1 t2)
 | TIUnionL : forall t1 t2, TypeIterator t1 -> TypeIterator (union t1 t2)
 | TIUnionR : forall t1 t2, TypeIterator t2 -> TypeIterator (union t1 t2).
@@ -655,7 +655,7 @@ define a function that extracts the current type at the iterator's position:
 \begin{small}\begin{verbatim}
 Fixpoint current (t:type)(ti:TypeIterator t):type :=
 match ti with
-| TIAtom i => atom i
+| TIPrim i => atom i
 | TITuple ti1 ti2 p1 p2 => tuple (current ti1 p1) (current ti2 p2)
 | TIUnionL ti1 ti2 pl => (current ti1 pl)
 | TIUnionR ti1 ti2 pr => (current ti2 pr)
@@ -670,7 +670,7 @@ given type:
 \begin{verbatim}
 Fixpoint start_iterator (t:type):TypeIterator t :=
   match t with
-  | (atom i) => TIAtom i
+  | (atom i) => TIPrim i
   | (tuple t1 t2) => TITuple t1 t2 (start_iterator t1) (start_iterator t2)
   | (union t1 t2) => TIUnionL t1 t2 (start_iterator t1)
   end.
@@ -683,7 +683,7 @@ to the next state or indicates that no such next state exists.
 \begin{small}\begin{verbatim}
 Fixpoint next(t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
   match ti with
-  | TIAtom i => None
+  | TIPrim i => None
   | TITuple ti1 ti2 p1 p2 =>
     match (next ti2 p2) with
     | Some np2 => Some(TITuple ti1 ti2 p1 np2)
@@ -855,7 +855,7 @@ implemented by \verb|iterator_to_path|:
 \begin{small}\begin{verbatim}
 Fixpoint iterator_to_path(t:type)(it:TypeIterator t):st_context :=
    match it with
-   | TIAtom _ => nil
+   | TIPrim _ => nil
    | TITuple t1 t2 it1 it2 => (iterator_to_path t1 it1) ++ (iterator_to_path t2 it2)
    | TIUnionL t1 _ it1 => false :: (iterator_to_path t1 it1)
    | TIUnionR _ t2 it1 => true :: (iterator_to_path t2 it1)
