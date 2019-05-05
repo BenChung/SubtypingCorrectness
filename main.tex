@@ -170,8 +170,8 @@ following judgment:
 set of values denoted by the type $t$ as {\small $\llbracket t \rrbracket$}.
 The left hand side denotes the values {\small $\{\tuple{v',v''} ~|~ v' \in
 \llbracket t' \rrbracket \cup \llbracket t'' \rrbracket \wedge v'' \in
-\llbracket t \rrbracket\}$}. The right hand side denotes {\small $\llbracket
-\tuple{t', t} \rrbracket \cup   \llbracket \tuple{t'', t} \rrbracket$}.
+\llbracket t \rrbracket\}$}, while the right hand side denotes {\small $\llbracket
+\tuple{t', t} \rrbracket \cup \llbracket \tuple{t'', t} \rrbracket$}.
 Obviously, the sets are the same. However, we cannot derive this relation from
 the above rules. According to those rules, we must pick either {\small $t'$}
 or {\small $t''$} for the right-hand union, ending up with either {\small
@@ -209,18 +209,23 @@ bigger} types. Real Julia code has types like the following~\cite{DBLP:NardelliB
 to store or to compute with.
 
 The second drawback of normalisation is that it does not interact well with
-other features of the Julia type system. For instance, invariant constructors
-make lifting union types to the top level unsound. Consider the type {\small
-\(\arrayt{\union{t'}{t''}}\)}, where {\small   \texttt{Array}} is an invariant
-unary constructor.  This type denotes the set of arrays whose elements are
-either of type {\small $t'$} or {\small   $t''$}; it would be incorrect to
-rewrite it as {\small \(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as this latter
-type denotes the set of arrays whose elements are either all of type {\small
-$t'$} or all of type {\small$t''$}.  A weaker disjunctive normal form, only
-lifting union types inside each invariant constructor, can circumvent this
-problem. However, doing so only to reveals a deeper problem in the presence of
-both invariant constructors and {existential types}.  Consider the judgment
-below:
+other features of the Julia type system. For instance, Julia supports invariant
+constructors, which are incompatible with union normalization. In Julia, all 
+parametric types aside from tuples are invariant on their arguments. For example,
+if we say that the type $\arrayt{\xt{Int}}$ is an array of ints, it would not
+be a subtype of $\arrayt{\xt{Any}}$. This seemingly simple feature, in conjunction
+with type variables, makes normalization ineffective as an algorithm for subtyping
+in Julia.
+
+Consider the type {\small \(\arrayt{\union{t'}{t''}}\)}. This type denotes the set
+of arrays whose elements are either of type {\small $t'$} or {\small   $t''$}.
+It would be incorrect to rewrite it as {\small
+\(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as this latter type denotes the set of
+arrays whose elements are either all of type {\small $t'$} or all of type
+{\small$t''$}. A weaker disjunctive normal form, only lifting union types
+inside each invariant constructor, can circumvent this problem. However, doing
+so only to reveals a deeper problem in the presence of both invariant
+constructors and {existential types}. This is illustrated by the following judgment:
 
 %
 \vspace{-3mm}{\small\[
@@ -228,34 +233,42 @@ below:
 \]}\vspace{-3mm}
 %
 
-\noindent  This judgment holds by taking {\small$T=\union{t}{t'}$}.
-Since all types are in weak normal form, a standard algorithm would
-initially perform the left-to-right subtype check due to the outer invariant
-constructor.  This step would generate the constraint
-{\small$T>:\union{t}{t'}$}.  As a consequence, the subsequent right-to-left
-check due to the invariant constructor fails.  Indeed this requires proving
-that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}, which in turns
-attempts to prove either {\small$T<:t$} or {\small$T<:t'$}, both unprovable
-under the assumption that {\small$T>:\union{t}{t'}$}. The key to derive a
-successful judgment for this relation is to rewrite the right-to-left check
-into {\small$\tuple{T}<:\tuple{\union{t}{t'}}$}, which is provable. This is
-a sort of \emph{anti-normalisation} rewriting that must be performed on
+\noindent This judgment holds if we set the existential {\small$T=\union{t}{t'}$}.
+Since all types are in weak normal form, an algorithm based on the standard
+system of judgment rules would strip off the array type constructors and proceed.
+However, since type constructors are invariant on their arguments, it must first test
+that the relation holds in the original order (e.g. that $\union{\tuple{t}}{\tuple{t}} <: \tuple{T}$) 
+and in the reverse order (that $\tuple{T} <: \union{\tuple{t}}{\tuple{t'}}$). It is in
+this combined check that we run into problems.
+
+The original order subtype check can be concluded without issue, producing the
+constraint on T$ {\small$\union{t}{t'} <: T$}. However, this constraint on $T$ is 
+stored for checking the reversed direction of subtyping, which is where the problems
+arise. When we check the opposite subtype order, we end up having to prove that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$} and in turn
+either {\small$T<:t$} or {\small$T<:t'$}. All of these are unprovable
+under the assumption that {\small$\union{t}{t'} <: T$}.
+
+The key to derive a successful judgment for this relation is to rewrite the
+right-to-left check into {\small$\tuple{T}<:\tuple{\union{t}{t'}}$}, which is
+provable. This \emph{anti-normalisation} rewriting must be performed on
 sub-judgments of the derivation, and to the best of our knowledge it is not
 part of any subtype algorithm based on ahead-of-time disjunctive
-normalisation.
+normalisation. As a result, straightforward normalization, even to a relaxed
+normal form, is incompatible with the full Julia type system.
 
-In this paper we describe the keys ideas used by the subtype algorithm
+In this paper we describe the key ideas used by the subtype algorithm
 implemented in the Julia language to deal with union types and covariant
-tuples, and we will argue that these avoid the two drawbacks above.  To
-avoid being drawn in the vast complexity of Julia type algebra, we focus on
-a minimal language featuring union types, covariant tuples, and literals.
-This tiny language is expressive enough to highlight the decision strategy,
-and make this implementation technique known to a wider audience.  While
-Julia implementation shows that this technique extends, among others, to
-invariant constructors and existential types~\cite{DBLP:NardelliBPCBV18}, we
-expect that it can be leveraged in many other modern language designs.
-Additionally we prove in Coq that the algorithm is correct and complete with
-respect to a standard semantic subtyping model.
+tuples. This strategy avoids both aforementioned problems, though we will
+focus  on the way that it solves the space explosion issue. To avoid being
+drawn in the vast complexity of Julia type algebra, we focus on a minimal
+language featuring union types, covariant tuples, and literals. This tiny
+language is expressive enough to highlight the decision strategy, and make
+this implementation technique known to a wider audience.  While Julia
+implementation shows that this technique extends, among others, to invariant
+constructors and existential types~\cite{DBLP:NardelliBPCBV18}, we expect that
+it can be leveraged in many other modern language designs. Additionally we
+prove in Coq that the algorithm is correct and complete with respect to a
+standard semantic subtyping model.
 
 
 \section{A space-efficient subtyping algorithm}
