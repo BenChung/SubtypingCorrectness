@@ -128,7 +128,8 @@ functions with the same body.
 
 Rules for subtyping union types and covariant tuples have been known for a
 long time. They may be written as:
-{\small\begin{mathpar}
+
+\vspace{-3mm}{\small\begin{mathpar}
 \inferrule{t' \sub t \\ t'' \sub t}{\union{t'}{t''} \sub t}
 
 \inferrule{t \sub t'}{t \sub \union{t'}{t''}}
@@ -137,7 +138,9 @@ long time. They may be written as:
 
 \inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \end{mathpar}}
-\noindent\!\!\!\!
+\vspace{-3mm}
+
+\noindent
 The union rules are asymmetrical. Following from set-theoretic intuitions,
 and as made formal by semantic subtyping models, when a union type appears
 on the left-hand side of a subtype judgment, then \emph{all} its components
@@ -150,12 +153,15 @@ and common. Under this justification, one might logically expect a union
 type to act as a set-theoretic union.  However, the above rules violate the
 set-theoretic underpinning that would be expected from a semantic
 subtyping~\cite{Pierce1991} system.  Consider the following judgment:
+
 %
-{\small\[
+\vspace{-3mm}{\small\[
 \tuple{\union{t'}{t''}, t} \ \ \sub\ \ \union{\tuple{t', t}}{\tuple{t'', t}} 
 \]}
+\vspace{-3mm}
 %
-\noindent\!\!\!\!  Under semantic semantics, this judgment should hold. The
+
+\noindent  Under semantic semantics, this judgment should hold. The
 left hand side denotes the values {\small $\tuple{v',v''}$} such that
 {\small $v' \in \llbracket t' \rrbracket \cup \llbracket t'' \rrbracket$}
 and {\small $v'' \in \llbracket t \rrbracket$} where {\small $\llbracket t
@@ -209,12 +215,12 @@ of both invariant constructors and {existential types}.  Consider the
 judgment below:
 
 %
-{\small\[
+\vspace{-3mm}{\small\[
   \arrayt{\union{\tuple{t}}{\tuple{t'}}} \ \ <:\ \ \exists T\,.\, \arrayt{\tuple{T}}
-\]}
+\]}\vspace{-3mm}
 %
 
-\noindent\!\!\!\!  This judgment holds by taking {\small$T=\union{t}{t'}$}.
+\noindent  This judgment holds by taking {\small$T=\union{t}{t'}$}.
 Since all types are in weak normal form, a standard algorithm would
 initially perform the left-to-right subtype check due to the outer invariant
 constructor.  This step would generate the constraint
