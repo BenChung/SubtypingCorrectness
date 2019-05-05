@@ -34,6 +34,15 @@
 
 %\hideLIPIcs
 
+\lstset{
+ language=caml,
+ columns=[c]fixed,
+ basicstyle=\small\ttfamily,
+ keywordstyle=\bfseries,
+ upquote=true,
+ commentstyle=,
+ breaklines=true,
+ showstringspaces=false}
 
 % jan comments 4/24/19
 % code bits are fairly wordy; see if both OCaml and Coq can be trimmed down
@@ -190,6 +199,7 @@ However, this standard algorithm based on ahead-of-time normalization has
 two major drawbacks.  The first drawback is that the normalization can lead
 to \emph{exponentially bigger} types. In Julia we observed
 types such as~\cite{DBLP:NardelliBPCBV18}:
+
 \begin{small}
 \begin{verbatim}
  Tuple{Tuple{Union{Int64, Bool}, Union{String, Bool}, Union{String, Bool}, 
@@ -199,6 +209,7 @@ types such as~\cite{DBLP:NardelliBPCBV18}:
              Union{String, Bool}, Union{String, Bool}, Union{String, Bool}}, Int64}
 \end{verbatim}
 \end{small}
+
 \noindent Its normal form has 32,768 terms. Working with such large types is
 not practical.  The second drawback of normalisation is that it does not
 interact well with other features of the Julia type system. For instance,
@@ -214,11 +225,13 @@ types inside each invariant constructor, can circumvent this
 problem. However, doing so only to reveals a deeper problem in the presence
 of both invariant constructors and {existential types}.  Consider the
 judgment below:
+
 %
 {\small\[
   \arrayt{\union{\tuple{t}}{\tuple{t'}}} \ \ <:\ \ \exists T\,.\, \arrayt{\tuple{T}}
 \]}
 %
+
 \noindent\!\!\!\!  This judgment holds by taking {\small$T=\union{t}{t'}$}.
 Since all types are in weak normal form, a standard algorithm would
 initially perform the left-to-right subtype check due to the outer invariant
@@ -261,14 +274,15 @@ section, we will describe the implementation of the algorithm in OCaml and
 will present our proof of correctness in Coq in the following section.
 We focus on a core type language composed of binary unions, covariant binary
 tuples, and atom types:
-\begin{small}
-\begin{verbatim}
-  type typ =
-    | Atom of int
-    | Tuple of typ * typ
-    | Union of typ * typ
-\end{verbatim}
-\end{small}
+
+
+\begin{lstlisting}
+type typ =
+ | Atom of int
+ | Tuple of typ * typ
+ | Union of typ * typ
+\end{lstlisting}
+
 Atom types are singletons with respect to subtyping, and are ranged
 over by
 \(A, B, ...\).  Abusing the
@@ -301,22 +315,23 @@ figure~\ref{fig:sstep}, where the deepest union in the initial state is the
 root; the algorithm flips this to take the right choice and then fills out the
 sub-tree with left choices until it reaches a  leaf.
 
-Storing sub-trees is expensive, however, as it requires storing a very incomplete
-tree structure. Our space-efficient representation encodes the same information as 
-the sub-trees, but does so without itself being aware of the type being iterated over's
-structure. It linearizes the choices made to construct the sub-tree into a list, which
-can then be manipulated in a manner isomorphic to the sub-trees.
+Storing sub-trees is expensive, however, as it requires storing a very
+incomplete tree structure. Our space-efficient representation encodes the
+same information as the sub-trees, but does so without itself being aware of
+the type being iterated over's structure. It linearizes the choices made to
+construct the sub-tree into a list, which can then be manipulated in a
+manner isomorphic to the sub-trees.
 
-Our space efficient representation stores choices that are made along a pre-order depth-first
-traversal of the iterated type tree. We can then manipulate this representation directly, avoiding
-the construction or storage of tree-structured iterators. The choices are stored as lists of 
-\verb|st_choice|s which
-indicate which branch of a union type was taken:
-\begin{small}
-\begin{verbatim}
+Our space efficient representation stores choices that are made along a
+pre-order depth-first traversal of the iterated type tree. We can then
+manipulate this representation directly, avoiding the construction or
+storage of tree-structured iterators. The choices are stored as lists of
+\verb|st_choice|s which indicate which branch of a union type was taken:
+
+\begin{lstlisting}
   type st_choice = Left | Right
-\end{verbatim}
-\end{small}
+\end{lstlisting}
+
 
 Lists of \verb|st_choice|s are isomorphic to the sub-tree representation when
 combined with the type being iterated over. To convert from sub-trees  to
@@ -325,31 +340,18 @@ which choices were made along the way. Going from choice lists to sub-trees can
 be done by traversing the full type using the choice list while adding the traversed
 nodes to the sub-tree.
 
-% The algorithm stores
-% the choice made at each union at the present iteration in two stacks of
-% \verb|st_choice|s, one for each side of the subtype relation. 
-% Each \verb|st_choice| stack can be seen as the state of an iterator that
-% enumerates every union-type induced alternative in a given type.  One
-% stack will be used to ensure that all \emph{forall} choices have been
-% explored; the other stack to search for a matching \emph{exist} choice.
-% In figure~\ref{fig:cfs}, these are depicted as the $\forall$ and $\exists$ stacks.
-
-% It is possible to define both an initial element and next state function for
-% iterators defined using \verb|st_choice| stacks.
-
 Since our algorithm moves left-to-right through the type tree, we will
 initialize it with the state that takes the left choice at every union:
 
-\begin{small}
-\begin{verbatim}
-  let rec initial_choice (a:typ) = 
-    match a with
-    | Atom i -> []
-    | Tuple(t1,t2) -> (initial_choice t1) @ (initial_choice t2)
-    | Union(l,r) -> Left::(initial_choice l)
-\end{verbatim}
-\end{small}
-%  | Tuple1 t -> initial_choice t
+
+\begin{lstlisting}
+let rec initial_choice (a:typ) = 
+  match a with
+  | Atom i -> []
+  | Tuple(t1,t2) -> (initial_choice t1) @ (initial_choice t2)
+  | Union(l,r) -> Left::(initial_choice l)
+\end{lstlisting}
+
 
 \begin{figure}
 \centering
@@ -395,8 +397,8 @@ we've encountered in the reversed list so far. We then reverse the result to
 produce the new choice list in correct order. This is implemented in the
 \verb|last_left_to_right| function, shown below.
 
-\begin{small}
-\begin{verbatim}
+
+\begin{lstlisting}
 let rec toggle_truncate = function
   | [] -> []    
   | Left::tl -> Right::tl
@@ -406,13 +408,13 @@ let last_left_to_right (l:st_choice list) =
   match List.rev (toggle_truncate (List.rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
-\end{verbatim}
-\end{small}
+\end{lstlisting}
 
-The stepped state is incomplete, however. The first element of the tuple has now
-changed, but the second element is no longer defined by either the sub-tree or its
-equivalent choice list. In order to define this second element, we need to complete
-the sub-tree and pad out the choice list. 
+
+The stepped state is incomplete, however. The first element of the tuple has
+now changed, but the second element is no longer defined by either the
+sub-tree or its equivalent choice list. In order to define this second
+element, we need to complete the sub-tree and pad out the choice list.
 
 The padding operation, taking the stepped state and producing the padded one, is determined
 by the direction of iteration. Since we go left-to-right through the type, we need to start
@@ -425,18 +427,16 @@ We show the padding operation for choice lists in OCaml, named
 the type being iterated through by following the given choice list until it
 runs out, then adding lefts until all branches have been explored.
 
-\begin{small}
-\begin{verbatim}
-  let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
-    | (Atom i, _) -> ([], ls)
-    | (Tuple(t1,t2), _) -> let (hd,tl) = extend_list t1 ls in
-                           let (hd2,tl2) = extend_list t2 tl in
-                           (hd @ hd2, tl2)
-    | (Union(l,r), Left::rs) -> let (hd,tl) = extend_list l rs in (Left::hd,tl)
-    | (Union(l,r), Right::rs) -> let (hd,tl) = extend_list r rs in (Right::hd,tl)
-    | (Union(l,r), []) -> (Left::initial_choice l,[])
-\end{verbatim}
-\end{small}
+\begin{lstlisting}
+let rec extend_list (a:typ) (ls:st_choice list) = match (a,ls) with
+ | (Atom i,_) -> ([],ls)
+ | (Tuple(t1,t2) _) -> let (hd,tl) = extend_list t1 ls in
+                        let (hd2,tl2) = extend_list t2 tl in
+                        (hd @ hd2,tl2)
+ | (Union(l,r),Left::rs) -> let (hd,tl) = extend_list l rs in (Left::hd,tl)
+ | (Union(l,r),Right::rs) -> let (hd,tl) = extend_list r rs in (Right::hd,tl)
+ | (Union(l,r),[]) -> (Left::initial_choice l,[])
+\end{lstlisting}
 
 
 Finally, the \verb|next_state| function combines these operations into
@@ -448,12 +448,12 @@ the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
 choice stack RL. To do so, it takes the left choice, converts it to a right,
 then pads the list out with lefts until the path is valid with respect to the 
 type.
-\begin{small}
-\begin{verbatim}
-  let rec next_state (a:typ) (ls:st_choice list) =
-    option_map fst (option_map (extend_list a) (last_left_to_right ls))
-\end{verbatim}
-\end{small}
+
+\begin{lstlisting}
+let rec next_state (a:typ) (ls:st_choice list) =
+  option_map fst (option_map (extend_list a) (last_left_to_right ls))
+\end{lstlisting}
+
 
 \subsection{Subtyping}
 
@@ -504,33 +504,30 @@ fundamental subtyping relation, used to decide subtyping relationships when
 given instantiations of the left and right hand types, then describe the
 algorithm that iterates through those types.
 
-\begin{small}
-\begin{verbatim}
-  type st_res =
-    | Subtype of st_choice list * st_choice list
-    | NotSubtype
-\end{verbatim}
-\end{small}
+\begin{lstlisting}
+type st_res =
+ | Subtype of st_choice list * st_choice list
+ | NotSubtype
+\end{lstlisting}
 
 The type \verb|st_res| represents the results of a single base subtype query. The query
 can either succeed, in which case it provides the unused portion of the input
 stacks, or fail. 
 
-\begin{small}
-\begin{verbatim}
-  let rec base_subtype (a:typ) (b:typ) (fa:st_choice list) (ex : st_choice list)
-    match (a,b,fa,ex) with
-    | (Atom i, Atom j, _, _) -> if i == j then Subtype(fa, ex) else NotSubtype
-    | (Tuple(ta1, ta2), Tuple(tb1, tb2), _, _) ->
-       (match base_subtype ta1 tb1 fa ex with
-        | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
-        | NotSubtype -> NotSubtype)
-    | (Union(a1,a2),b,choice::fa,ex) -> 
-                base_subtype (match choice with Left -> a1 | Right -> a2) b fa ex
-    | (a,Union(b1,b2),fa,choice::ex) -> 
-                base_subtype a (match choice with Left -> b1 | Right -> b2) fa ex
-\end{verbatim}
-\end{small}
+\begin{lstlisting}
+let rec base_subtype(a:typ)(b:typ)(fa:st_choice list)(ex:st_choice list)
+ match (a,b,fa,ex) with
+ | (Atom i,Atom j,_,_) -> if i==j then Subtype(fa,ex) else NotSubtype
+ | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
+    (match base_subtype ta1 tb1 fa ex with
+     | Subtype(cfa, cex) -> base_subtype ta2 tb2 cfa cex
+     | NotSubtype -> NotSubtype)
+ | (Union(a1,a2),b,choice::fa,ex) -> 
+       base_subtype (match choice with Left->a1 | Right->a2) b fa ex
+ | (a,Union(b1,b2),fa,choice::ex) -> 
+       base_subtype a (match choice with Left->b1 | Right->b2) fa ex
+\end{lstlisting}
+
 
 The function \verb|base_subtype| is responsible for using two
 paths---one for the left and right hand sides of the subtyping
@@ -542,7 +539,7 @@ stacks and continue recursively. The function then returns an instance
 of \verb|st_res|, which gives the remaining choice stacks if
 successful or nothing otherwise.
 
-\par
+
 Finally, to check subtyping, we need to iterate through both types in the 
 correct quantification order. Subtyping holds if, for every instantiation 
 of the left there exists an instantiation of the right hand side of the
@@ -554,35 +551,35 @@ of the right-hand-side for a given left-hand-side. \verb|fa_ex_subtype|
 uses \verb|ex_subtype| to check that for every instantiation of the LHS,
 there is an instantiation of the RHS such that the subtype relation
 holds. 
-\par
-\begin{small}
-\begin{verbatim}
-  let rec ex_subtype (a:typ)(b:typ)(fa:st_choice list)(cex : st_choice list) =
-    match base_subtype a b fa cex with (* is a <: b *)
-    | Subtype(_,_) -> true (* there exists a subtype *)
-    | NotSubtype -> 
-       (match next_state b cex with (* step exists-env *)
-        | Some ns -> ex_subtype a b fa ns (* continue *)
-        | None -> false) (* no subtype; exit *)
-\end{verbatim}
-\end{small}
-If the current choice---given by \verb|cex|---is a supertype of the given \verb|a| according
-to \verb|base_subtype|, then \verb|ex_subtype| has found a valid instantiation of \verb|b|. Therefore,
-there exists an instantiation of \verb|b| that is a supertype of \verb|a| and the result should be true.
-Otherwise, \verb|ex_subtype| will use the iteration operation, \verb|next_state|, to continue iterating
-through choices for \verb|b| until it either finds an instantiation that is a supertype or runs out
-of instantiations.
 
-\begin{small}
-  \begin{verbatim}
-  let rec fa_ex_subtype (a:typ)(b:typ)(cfa:st_choice list) =
-    match ex_subtype a b cfa (initial_choice b) with (* a <: b wrt path? *)
-    | true -> (match next_state a cfa with
-               | Some ns -> fa_ex_subtype a b ns (* continue *)
-               | None -> true) (* all subtypes; is subtype *)
-    | false -> false (* exists a non-subtype; not subtype *)
-\end{verbatim}
-\end{small}
+
+\begin{lstlisting}
+let rec ex_subtype(a:typ)(b:typ)(fa:st_choice list)(cex:st_choice list) =
+  match base_subtype a b fa cex with 
+  | Subtype(_,_) -> true 
+  | NotSubtype -> 
+     (match next_state b cex with
+      | Some ns -> ex_subtype a b fa ns 
+      | None -> false) 
+\end{lstlisting}
+
+If the current choice---given by \verb|cex|---is a supertype of the given
+\verb|a| according to \verb|base_subtype|, then \verb|ex_subtype| has found
+a valid instantiation of \verb|b|. Therefore, there exists an instantiation
+of \verb|b| that is a supertype of \verb|a| and the result should be true.
+Otherwise, \verb|ex_subtype| will use the iteration operation,
+\verb|next_state|, to continue iterating through choices for \verb|b| until
+it either finds an instantiation that is a supertype or runs out of
+instantiations.
+
+ \begin{lstlisting}
+let rec fa_ex_subtype (a:typ)(b:typ)(cfa:st_choice list) =
+  match ex_subtype a b cfa (initial_choice b) with 
+  | true -> (match next_state a cfa with
+             | Some ns -> fa_ex_subtype a b ns 
+             | None -> true) 
+  | false -> false
+\end{lstlisting}
 
 The function \verb|fa_ex_subtype| is similar; it checks that for every
 instantiation of \verb|a|, there exists an instantiation of 
@@ -601,12 +598,9 @@ that subtyping holds. Therefore, for every instantaition of the left-hand-side,
 there exists an instantiation of the right-hand-side such that subtyping holds
 and subtyping holds for the type as a whole.
 
-
-\begin{small}
-\begin{verbatim}
-  let subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
-\end{verbatim}
-\end{small}
+\begin{lstlisting}
+let subtype (a:typ) (b:typ) = fa_ex_subtype a b (initial_choice a)
+\end{lstlisting}
 
 Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
 It seeds \verb|fa_ex_subtype| with the initial choice for \verb|a|'s
