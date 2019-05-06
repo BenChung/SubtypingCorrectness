@@ -242,7 +242,7 @@ and in the reverse order (that $\tuple{T} <: \union{\tuple{t}}{\tuple{t'}}$). It
 this combined check that we run into problems.
 
 The original order subtype check can be concluded without issue, producing the
-constraint on T$ {\small$\union{t}{t'} <: T$}. However, this constraint on $T$ is 
+constraint on $T$ {\small$\union{t}{t'} <: T$}. However, this constraint on $T$ is 
 stored for checking the reversed direction of subtyping, which is where the problems
 arise. When we check the opposite subtype order, we end up having to prove that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$} and in turn
 either {\small$T<:t$} or {\small$T<:t'$}. All of these are unprovable
@@ -276,9 +276,8 @@ standard semantic subtyping model.
 This section presents a simplified version of Julia's subtype algorithm.  To
 better align with our Coq proof, the algorithm is implemented in Ocaml.  For
 clarity, we omit some optimizations (they are discussed at the end of the
-sections).
-We focus on a core type language composed of binary unions, covariant binary
-tuples, and primitive types:
+section). We focus on a core type language composed of binary unions,
+covariant binary tuples, and primitive types:
 
 \begin{lstlisting}
 type typ =
@@ -288,14 +287,14 @@ type typ =
 \end{lstlisting}
 
 Prim types are singletons with respect to subtyping, and are ranged over by
-\(t_1, ... t_n\).
+\(p_1, ... p_n\).
 
 \subsection{Overview}
 
 Consider the following query:
 
 \[
-\union{ \tuple{t_1,t_2}}{\tuple{t_3,t_2}}  <:  \tuple{ \union{t_3}{t_1}, \union{t_1}{t_2}}
+\union{ \tuple{p_1,p_2}}{\tuple{p_3,p_2}}  <:  \tuple{ \union{p_3}{p_1}, \union{p_1}{p_2}}
 \]
 
 
@@ -303,18 +302,18 @@ If we normalize it we would get a left hand side that is the union of the
 following two tuples:
 
 \[
-1: \tuple{t_1,t_2}, \quad
-2: \tuple{t_3,t_2}
+1: \tuple{p_1,p_2}, \quad
+2: \tuple{p_3,p_2}
 \]
 
 
 The right hand side normalizes to the union of the following four tuples:
 
 \[
-1: \tuple{t_3,t_1}, \quad
-2: \tuple{t_3,t_2}
-3: \tuple{t_1,t_1}, \quad
-4: \tuple{t_1,t_2}
+1: \tuple{p_3,p_1}, \quad
+2: \tuple{p_3,p_2}
+3: \tuple{p_1,p_1}, \quad
+4: \tuple{p_1,p_2}
 \]
 
 
