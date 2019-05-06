@@ -294,18 +294,28 @@ Prim types are singletons with respect to subtyping, and are ranged over by
 Consider the following query:
 
 \[
-\union{ \tuple{p_1,p_2}}{\tuple{p_3,p_2}}  <:  \tuple{ \union{p_3}{p_1}, \union{p_1}{p_2}}
+\union{ \tuple{p_1,p_2}}{\tuple{p_2,p_3}}  <:  \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}
 \]
 
+Are these types subtypes? Under the semantic definition of subtyping, we need to ensure that for every
+possible choice on the left hand side, there exists another choice on the right hand
+side such that subtyping holds between them. If we use normalization, we compute
+all of the choices ahead of time, illustrating this relation explicitly.
 
-If we normalize it we would get a left hand side that is the union of the
-following two tuples:
+We can write out the options on both sides that are available to us after
+normalizing. On the left hand side, the union of tuples gives us two clear
+choices.
 
 \[
-1: \tuple{p_1,p_2}, \quad
-2: \tuple{p_3,p_2}
+\begin{array}{c|c}
+LHS & RHS \\
+\hline
+\tuple{p_1,p_2} & \tuple{p_2,p_3}\\
+\tuple{p_2,p_3} & \tuple{p_2,p_2}\\
+& \tuple{p_1,p_3}\\
+& \tuple{p_1,p_2}\\
+\end{array}
 \]
-
 
 The right hand side normalizes to the union of the following four tuples:
 
@@ -1094,12 +1104,12 @@ space) and without additionally constraining type system features.
 
 \subsubsection*{Acknowledgments}
 The authors thank Jiahao Chen for starting us down the path of understanding
-Julia, Jeff Bezanson for coming up with Julia's subtyping algorithm.  This
+Julia, and Jeff Bezanson for coming up with Julia's subtyping algorithm.  This
 work received funding from the European Research Council under the European
 Union's Horizon 2020 research and innovation programme (grant agreement
 695412), the NSF (award 1544542 and award 1518844) and the Czech Ministry of
 Education, Youth and Sports (grant agreement
-CZ.02.1.01/0.0/0.0/15_003/0000421).
+CZ.02.1.01/0.0/0.0/15\_003/0000421).
  
 
 %\bibliographystyle{plain}
