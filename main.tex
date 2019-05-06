@@ -304,65 +304,64 @@ all of the choices ahead of time, illustrating this relation explicitly.
 
 We can write out the options on both sides that are available to us after
 normalizing. On the left hand side, the union of tuples gives us two clear
-choices.
+choices, while the right hand side gives us four:
 
 \[
-\begin{array}{c|c}
+\begin{array}{r|l}
 LHS & RHS \\
 \hline
-\tuple{p_1,p_2} & \tuple{p_2,p_3}\\
-\tuple{p_2,p_3} & \tuple{p_2,p_2}\\
-& \tuple{p_1,p_3}\\
-& \tuple{p_1,p_2}\\
+l1: \tuple{p_1,p_2} & r1: \tuple{p_2,p_3}\\
+l2: \tuple{p_2,p_3} & r2: \tuple{p_2,p_2}\\
+                    & r3: \tuple{p_1,p_3}\\
+                    & r4: \tuple{p_1,p_2}\\
 \end{array}
 \]
 
-The right hand side normalizes to the union of the following four tuples:
+Using these lists, we can decide semantic subtyping between these two
+types. To do so, we need to check that for every element on the left-hand-side,
+there is an element on the right-hand-side that is a supertype. We can 
+see that l1 is a subtype of r4, and that l2 is a subtype of r1, so the
+semantic subtyping relationship between these two types holds.
 
+To decide subtyping algorithmically we follow the same principle. We
+use two functions: allexists, which iterates through every left-hand-side
+choice and calls the second function, exists, which finds a right-hand-side
+type that is a supertype of the chosen left-hand-side type. Each function
+holds as state a position within the sequence of tuples, and iterates through 
+each list as required.
+
+This algorithm works to decide subtyping; however, we needed to normalize
+the types to lists of clauses first, which as previously mentioned can consume
+considerable amounts of space. Instead of materializing the normalized forms
+of each type we can iterate through the same space by walking over the
+ASTs of the type terms. In this manner, we achieve the same effect---iteration
+over all possible normalized forms---but without precomputing the list of normal forms.
+
+We can view the current position in the list as state of an iterator.
+Equivalently to ``position in normalized list'' as iterator state,
+we can use ``choices within type AST'' as our state; in this representation,
+we remember each choice made within the type AST (i.e. every union encountered), 
+which then defines a specific term in the normalized equivalent of the original type.
+
+Consider, for example,
 \[
-1: \tuple{p_3,p_1}, \quad
-2: \tuple{p_3,p_2}
-3: \tuple{p_1,p_1}, \quad
-4: \tuple{p_1,p_2}
+ \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}
 \]
+The AST for this type is the following tree:
 
+\includegraphics[scale=0.5]{figures-gen/exmp1.pdf}
 
-Subtyping can be defined with two helper functions, allexists, which
-iterates through every left-hand side tuple and checks that for each
-one, the second function, exists, finds at least one matching tuple
-on the right hand side.
-
-Each of these function takes as state a position in the sequences
-of tuples.
-
-The intuition is that instead of materializing those sequences of tuples
-which would requires exponential space, we will iterate through that
-space by walking over the abstract syntax trees of  type terms.
-
-The state of the iterators is the encoding of position in the tree
-that remembers all of the choice points, i.e. all of the unions that
-were encountered.
-
-Consider
-
- tuple union t3 t1 union t1 t2
-
-This gives the following tree
-
-      tuple
-
- union     union
-
-t3  t1     t1 t2
-
-
-Position 1 in the normalized sequence can be encoded  as LL,
-position 2 is LR, 3 is RL and 4 is RR.
-
-Each letter in the string represents one choice point.
-
-
-
+We can recover the types in the normalized sequence from the choices made at
+each union in this tree. Position 1 in the normalized list can be encoded as a
+left choice at the first union, then a left choice at the second union. Using
+the order over trees defined by an inorder depth-first traversal, we could
+call this taking the first and second lefts, or left left, or LL for short.
+Similarly, note that position 2 corresponds to taking the left choice at the
+first union, then the right choice at the second, or equivalently LR, while
+position 3 and 4 in the normalized list are equivalent to RL and RR,
+respectively. Each letter in each of the string represents one choice point,
+and we can reconstruct the list of normalized types purely from the strings of
+choices made at unions in the AST.
 
 \subsection{Unchanged.}
 The greatest difficulty of subtyping union types is searching the entire
