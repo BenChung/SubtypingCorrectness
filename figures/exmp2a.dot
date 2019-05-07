@@ -1,0 +1,18 @@
+digraph G {
+    margin=0;bgcolor="transparent";
+  node [shape=box, margin=0.1, width=0, height=0];
+  tuple [label="Tuple", color=lightblue,style=filled]
+  union1 [label="Union", xlabel="L", color=lightblue,style=filled]
+  union2 [label="Union", xlabel="L", color=lightblue,style=filled]
+  A [label=<p<SUB>2</SUB>>, color=lightblue,style=filled]
+  B [label=<p<SUB>1</SUB>>]
+  C [label=<p<SUB>3</SUB>>, color=lightblue,style=filled]
+  D [label=<p<SUB>2</SUB>>]
+  tuple -> union1
+  tuple -> union2
+  union1 -> A
+  union1 -> B
+  union2 -> C
+  union2 -> D
+  {rank=same; union1 union2}
+}
