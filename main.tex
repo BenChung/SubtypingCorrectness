@@ -297,13 +297,17 @@ Consider the following query:
 \union{ \tuple{p_1,p_2}}{\tuple{p_2,p_3}}  <:  \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}
 \]
 
-Are these types subtypes? Under the semantic definition of subtyping, we need to ensure that for every
-possible choice on the left hand side, there exists another choice on the right hand
-side such that subtyping holds between them. If we use normalization, we compute
-all of the choices ahead of time, illustrating this relation explicitly.
+Are these types subtypes? Under the semantic definition of subtyping, we need
+to ensure that every value denoted on the left hand side is present on the
+right. It is easy to decide the subset relation for primitive types and tuples, 
+as each denotes a simple fixed set, but unions induce difficulty. Using normalization,
+we can reduce subtyping between types using unions to repeated subtyping of tuples and
+primitives by looking at each type as a list of its basic types.
 
-We can write out the options on both sides that are available to us after
-normalizing. On the left hand side, the union of tuples gives us two clear
+To do so, we can write out in a list every union-less type we can make out of our original type.
+For every union in the type under consideration, we can select ``which way'' it went, be it left
+or right. We construct a list of normalized choices by taking every such choice and remembering
+what types we ended up with. On the left hand side, the union of tuples gives us two clear
 choices, while the right hand side gives us four:
 
 \[
@@ -362,6 +366,38 @@ position 3 and 4 in the normalized list are equivalent to RL and RR,
 respectively. Each letter in each of the string represents one choice point,
 and we can reconstruct the list of normalized types purely from the strings of
 choices made at unions in the AST.
+
+This equivalence between indices into terms from normalization and choices in
+the type tree is interesting. If we draw out each of the choices at unions that were made
+for each of the normalized terms in the type trees, we can see a pattern. In the following,
+we show the selected components of the type ASTs in blue, and the choice made at each union
+as an L for a left choice and R for a right choice above and to the left of the node.
+
+\begin{tabular}{r|c|c|c|c}
+Index:&1 & 2 & 3 & 4\\
+Tree:&\includegraphics[scale=0.35]{figures-gen/exmp2a.pdf} &
+\includegraphics[scale=0.35]{figures-gen/exmp2b.pdf} &
+\includegraphics[scale=0.35]{figures-gen/exmp2c.pdf} &
+\includegraphics[scale=0.35]{figures-gen/exmp2d.pdf} \\
+Equivalent list:&LL&LR&RL&RR
+\end{tabular}
+
+A pattern emerges! Each successive index into the list of
+normal terms corresponds to a simple operation on the previous
+choices at unions within the tree. To find the following normal 
+term from the choices of the prior term, it suffices to find the
+rightmost L-choice, turn it into a R-choice, and then replace all
+of the remaining choices with L-choices. Instead of indexing into
+the list of normal terms, our algorithm could instead perform this
+tree operation.
+
+However, there is a further simplification yet. If we examine the  linearized
+form of the choices-at-unions in this example, it looks very similar to a
+2-bit binary number where L is 0 and R is 1. Moreover, if we consider the
+effects of the tree choice alteration operation on the list of choices, we can
+see that the analogy to binary numbers is clear. We find the rightmost
+L-choice, make it into a R-choice, and then make all following choices into
+L-choices.
 
 \subsection{Unchanged.}
 The greatest difficulty of subtyping union types is searching the entire
