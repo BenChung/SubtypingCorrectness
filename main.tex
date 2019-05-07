@@ -312,12 +312,12 @@ choices, while the right hand side gives us four:
 
 \[
 \begin{array}{r|l}
-LHS & RHS \\
+\text{LHS} & \text{RHS} \\
 \hline
-l1: \tuple{p_1,p_2} & r1: \tuple{p_2,p_3}\\
-l2: \tuple{p_2,p_3} & r2: \tuple{p_2,p_2}\\
-                    & r3: \tuple{p_1,p_3}\\
-                    & r4: \tuple{p_1,p_2}\\
+\text{l1:} \tuple{p_1,p_2} & \text{r1:} \tuple{p_2,p_3}\\
+\text{l2:} \tuple{p_2,p_3} & \text{r2:} \tuple{p_2,p_2}\\
+                    & \text{r3:} \tuple{p_1,p_3}\\
+                    & \text{r4:} \tuple{p_1,p_2}\\
 \end{array}
 \]
 
@@ -374,6 +374,7 @@ we show the selected components of the type ASTs in blue, and the choice made at
 as an L for a left choice and R for a right choice above and to the left of the node.
 
 \begin{tabular}{r|c|c|c|c}
+Normal type:&$\tuple{p_2,p_3}$&$\tuple{p_2,p_2}$&$\tuple{p_1,p_3}$&$\tuple{p_1,p_2}$\\
 Index:&1 & 2 & 3 & 4\\
 Tree:&\includegraphics[scale=0.35]{figures-gen/exmp2a.pdf} &
 \includegraphics[scale=0.35]{figures-gen/exmp2b.pdf} &
@@ -398,6 +399,101 @@ effects of the tree choice alteration operation on the list of choices, we can
 see that the analogy to binary numbers is clear. We find the rightmost
 L-choice, make it into a R-choice, and then make all following choices into
 L-choices.
+
+\begin{figure}
+\centering
+\begin{tabularx}{\linewidth}{c|ccc}
+& Initial & Stepped & Padded\\
+Subtree: &
+\includegraphics[scale=0.50]{figures-gen/transex1.pdf} & 
+\includegraphics[scale=0.50]{figures-gen/transex2.pdf} & 
+\includegraphics[scale=0.50]{figures-gen/transex3.pdf} \\
+Choice List: & \underline{L}R & \underline{R} & \underline{R}L \\
+Effective Type: & \tuple{A,D} & \tuple{B,?} & \tuple{B,C} \\
+\end{tabularx}
+\caption{State-stepping operation for choice lists}
+\label{fig:sstep}
+\end{figure}
+
+Figure~\ref{fig:sstep} shows these two equivalent processes in detail,
+depicting the transition between the second to the third normal type. In
+the initial state, the tree form depicts us taking an L-choice at the first
+union and an R-choice at the second union; equivalently, the linear representation
+takes a L-choice than an R-choice. In the stepping operation, we notice that the
+final choice is an R-choice, so we cannot step it further; we continue back and
+identify that the first choice is an L-choice, so we turn it into an R-choice and
+remove all following choices. However, we have not made a choice at all unions
+anymore, as we no longer have a choice for the right union. To fix this, we make
+the L-choice at every union without a defined choice, equivalent to padding out
+the linearized representation with L-choices until it has a choice for every union.
+
+To fully define this stepping function, we depict an implementation in OCaml.
+It uses the linear representation of the choices made in a type AST, operating
+over \lstinline{choice list}s and \lstinline{typ}s. A new iterator state may
+be constructed by using the \lstinline{pad} function to pad out the empty
+choice list with L-choices, making a L-choice for every union in the type.
+Stepping then works in the same two phases as above; the \lstinline{next}
+function first calls \lstinline{step}, which finds the final L-choice in the
+list, turns it into an R-choice, and truncates all remaining choices. Then,
+\lstinline{next} calls \lstinline{pad} to fill out the rest of the list with
+L-choices to ensure that all unions have a choice. If no L-choices remain in
+the list, \lstinline{step} will return \lstinline{None}, indicating that there
+are no more normal types to explore in the type being iterated.
+
+\noindent
+\begin{minipage}{\textwidth}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+type choice = Left | Right
+
+
+
+
+let rec toggle = function
+  | [] -> []    
+  | Left::tl -> Right::tl
+  | Right::tl -> toggle tl
+
+let step (l:choice list) =
+  let reversed = List.rev l in
+  match List.rev (toggle reversed) with
+  | [] -> None
+  | hd::tl -> Some(hd::tl)
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+let rec pad(a:typ)
+           (l:choice list) = 
+match (a,ls) with
+ | (Prim i,_) -> ([],ls)
+ | (Tuple(t1,t2) _) -> 
+    let (hd,tl) = pad t1 ls in
+    let (hd2,tl2) = pad t2 tl in
+    (hd @ hd2,tl2)
+ | (Union(l,r),Left::rs) -> 
+   let (hd,tl) = pad l rs in 
+   (Left::hd,tl)
+ | (Union(l,r),Right::rs) -> 
+   let (hd,tl) = pad r rs in 
+   (Right::hd,tl)
+ | (Union(l,r),[]) -> 
+   (Left::initial l,[])
+\end{lstlisting}
+\end{minipage}
+
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+let rec next(a:typ)(l:choice list) =
+  option_map fst (option_map (pad a) (last l))
+\end{lstlisting}
+\end{minipage}
+\end{minipage}
+
+
+Through this mechanism, we have found two representations we can use as state
+for an iterator that examines every normal type in the normalized form without
+having to precompute them. It remains to use it to decide subtyping.
 
 \subsection{Unchanged.}
 The greatest difficulty of subtyping union types is searching the entire
@@ -447,11 +543,6 @@ manipulate this representation directly, avoiding the construction or
 storage of tree-structured iterators. The choices are stored as lists of
 \verb|choice|s which indicate which branch of a union type was taken:
 
-\begin{lstlisting}
-  type choice = Left | Right
-\end{lstlisting}
-
-
 Lists of \verb|choice|s are isomorphic to the sub-tree representation when
 combined with the type being iterated over. To convert from sub-trees  to
 choice lists we simply conduct a preorder traversal of the sub-tree recording
@@ -462,30 +553,6 @@ nodes to the sub-tree.
 Since our algorithm moves left-to-right through the type tree, we will
 initialize it with the state that takes the left choice at every union:
 
-
-\begin{lstlisting}
-let rec initial(a:typ) = 
-  match a with
-  | Prim i -> []
-  | Tuple(t1,t2) -> (initial t1) @ (initial t2)
-  | Union(l,r) -> Left::(initial l)
-\end{lstlisting}
-
-
-\begin{figure}
-\centering
-\begin{tabularx}{\linewidth}{c|ccc}
-& Initial & Stepped & Padded\\
-Subtree: &
-\includegraphics[scale=0.55]{figures-gen/transex1.pdf} & 
-\includegraphics[scale=0.55]{figures-gen/transex2.pdf} & 
-\includegraphics[scale=0.55]{figures-gen/transex3.pdf} \\
-Choice List: & \underline{L}R & \underline{R} & \underline{R}L \\
-Effective Type: & \tuple{A,D} & \tuple{B,?} & \tuple{B,C} \\
-\end{tabularx}
-\caption{State-stepping operation for choice lists}
-\label{fig:sstep}
-\end{figure}
 
 Next, we define the step function. In the sub-tree intuition, we want to find
 the deepest union (left-to-right through tuples) in our current sub-tree where
@@ -517,18 +584,6 @@ produce the new choice list in correct order. This is implemented in the
 \verb|last| function, shown below.
 
 
-\begin{lstlisting}
-let rec toggle = function
-  | [] -> []    
-  | Left::tl -> Right::tl
-  | Right::tl -> toggle tl
-
-let last(l:choice list) =
-  match List.rev (toggle(List.rev l)) with
-  | [] -> None
-  | hd::tl -> Some(hd::tl)
-\end{lstlisting}
-
 
 The stepped state is incomplete, however. The first element of the tuple has
 now changed, but the second element is no longer defined by either the
@@ -546,17 +601,6 @@ We show the padding operation for choice lists in OCaml, named
 the type being iterated through by following the given choice list until it
 runs out, then adding lefts until all branches have been explored.
 
-\begin{lstlisting}
-let rec pad(a:typ)(l:choice list) = match (a,ls) with
- | (Prim i,_) -> ([],ls)
- | (Tuple(t1,t2) _) -> let (hd,tl) = pad t1 ls in
-                        let (hd2,tl2) = pad t2 tl in
-                        (hd @ hd2,tl2)
- | (Union(l,r),Left::rs) -> let (hd,tl) = pad l rs in (Left::hd,tl)
- | (Union(l,r),Right::rs) -> let (hd,tl) = pad r rs in (Right::hd,tl)
- | (Union(l,r),[]) -> (Left::initial l,[])
-\end{lstlisting}
-
 
 Finally, the \verb|next| function combines these operations into
 a single step operation. It will take the deepest alternative choice
@@ -567,11 +611,6 @@ the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
 choice stack RL. To do so, it takes the left choice, converts it to a right,
 then pads the list out with lefts until the path is valid with respect to the 
 type.
-
-\begin{lstlisting}
-let rec next(a:typ)(l:choice list) =
-  option_map fst (option_map (pad a) (last l))
-\end{lstlisting}
 
 \subsection{Subtyping}
 
