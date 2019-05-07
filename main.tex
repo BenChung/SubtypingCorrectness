@@ -495,6 +495,14 @@ Through this mechanism, we have found two representations we can use as state
 for an iterator that examines every normal type in the normalized form without
 having to precompute them. It remains to use it to decide subtyping.
 
+\subsection{Subtyping}
+
+As discussed previously, we can decide subtyping by deciding if there is some
+value denoted by the right hand side for every value denoted by the left. In our
+type language, we accomplish this by finding one of the constituent base types 
+on the right for each base type on the left. The original subtyping algorithm 
+we proposed did this by normalizing both sides to 
+
 \subsection{Unchanged.}
 The greatest difficulty of subtyping union types is searching the entire
 space of possible forall/exist quantifications of union types. We have seen
