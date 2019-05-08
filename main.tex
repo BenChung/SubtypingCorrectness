@@ -498,10 +498,114 @@ having to precompute them. It remains to use it to decide subtyping.
 \subsection{Subtyping}
 
 As discussed previously, we can decide subtyping by deciding if there is some
-value denoted by the right hand side for every value denoted by the left. In our
-type language, we accomplish this by finding one of the constituent base types 
-on the right for each base type on the left. The original subtyping algorithm 
-we proposed did this by normalizing both sides to 
+value denoted by the right hand side for every value denoted by the left. In
+our type language, we accomplish this by finding one of the constituent base
+types  on the right for each base type---a type without any unions---on the
+left. The original subtyping algorithm  we proposed did this by normalizing
+both sides to lists of their base type constituents, then using a base
+subtyping relation to establish the  required relationship between said lists.
+We aim to replace the normalization to a list of base types with iterators
+that have the same meaning.
+
+We can do this in a very straightforward way. Since we have demonstrated the
+equivalence of iterating through possible choices within the type AST to
+iterating through the arrays of base types produced by normalization, we can
+use the exact same algorithm with only minor changes. As before, our algorithm
+needs to find a supertype on the right for every base type on the left.
+
+
+
+\begin{figure}[h]
+\center
+\begin{tabular}{cc|cc|c}
+\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
+\hline
+$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
+\hline
+\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
+    & \goodcell ${A} <: {A}$ \\
+\hline
+\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
+    & \badcell ${B} \not<: {A}$ \\
+\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \goodcell ${B} <: {B}$ \\
+\hline
+\end{tabular}
+
+\hspace{1em}
+
+$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
+
+\caption{Subtyping decision procedure example}\label{fig:cfs}
+\end{figure}
+
+This algorithm works just as it did with the two lists of base types produced
+by normalization, but iterating over the choices implied by the type AST
+instead of the explicit base types. An example of its operation is shown in
+figure~\ref{fig:cfs}, which depicts its operation over a subtype query. In
+this example, both iterators start in the state ``L'', corresponding to the
+base type $\tuple{A}$ on the left and $\tuple{A}$ on the right. These are trivially
+subtypes, so this first case of the left-hand universal quantification is finished and
+the left-hand iterator may now be stepped to find the next. 
+
+Now that the left-hand iterator is taking the R choice, we restart the right-hand-side
+iterator to see if there exists a choice for the right-hand union that makes a supertype
+of the left-hand's $\tuple{B}$. The initial state for the right-hand-side is ``L'', 
+inducing the type $\tuple{A}$, which is not a supertype of $\tuple{B}$. We can continue
+in spite of this failure, as there remains one more step in the right-hand iterator, 
+inducing $\tuple{A}$ from the choice R. Thus, we have found a choice on the right for
+each choice on the left such that the left-hand base type is a subtype of the right-hand
+base type.
+
+We again present an implementation of this algorithm in OCaml. The core operation of
+subtyping is subtyping between base types, which we implement by implicitly sub-setting
+the full type AST given the lists of choices made on each side.
+
+\begin{lstlisting}
+type res =
+ | IsSub of choice list * choice list
+ | NotSub
+\end{lstlisting}
+
+\begin{lstlisting}
+let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
+ match (a,b,f,e) with
+ | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
+ | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
+    (match sub ta1 tb1 f e with
+     | IsSub(f', e') -> sub ta2 tb2 f' e'
+     | NotSub -> NotSub)
+ | (Union(a1,a2),b,d::f',e) -> 
+       sub (match d with Left->a1 | Right->a2) b f' e
+ | (a,Union(b1,b2),f,d::e') -> 
+       sub a (match d with Left->b1 | Right->b2) f e'
+\end{lstlisting}
+
+\begin{lstlisting}
+let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
+ match sub a b f e with 
+  | IsSub(_,_) -> true 
+  | NotSub -> 
+     (match next b e with
+      | Some ns -> exists a b f ns 
+      | None -> false) 
+\end{lstlisting}
+
+ \begin{lstlisting}
+let rec allexists(a:typ)(b:typ)(f:choice list) =
+  match exists a b f (initial b) with 
+  | true -> (match next a f with
+             | Some ns -> allexists a b ns 
+             | None -> true) 
+  | false -> false
+\end{lstlisting}
+
+
+\begin{lstlisting}
+let subtype(a:typ)(b:typ) = allexists a b (initial a)
+\end{lstlisting}
+
+
 
 \subsection{Unchanged.}
 The greatest difficulty of subtyping union types is searching the entire
@@ -622,32 +726,6 @@ type.
 
 \subsection{Subtyping}
 
-\begin{figure}[h]
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-    & \goodcell ${A} <: {A}$ \\
-\goodcell L & \badcell R & \badcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \badcell ${A} \not<: {B}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-    & \badcell ${B} \not<: {A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \goodcell ${B} <: {B}$ \\
-\hline
-\end{tabular}
-
-\hspace{1em}
-
-$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
-
-\caption{Subtyping decision procedure example}\label{fig:cfs}
-\end{figure}
-
 Now that we have defined the core iterator infrastructure, we show how it
 is used to decide subtyping queries. Subtyping is defined on a forall-exists
 basis, or for every choice on the left there must exist a choice on the right
@@ -716,15 +794,6 @@ right-hand-side for a given left-hand-side. \verb|allexists| uses
 instantiation of the RHS such that the subtype relation holds.
 
 
-\begin{lstlisting}
-let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
- match sub a b f e with 
-  | IsSub(_,_) -> true 
-  | NotSub -> 
-     (match next b e with
-      | Some ns -> exists a b f ns 
-      | None -> false) 
-\end{lstlisting}
 
 If the current choice---given by \verb|e|---is a supertype of the given
 \verb|a| according to \verb|sub|, then \verb|exists| has found a valid
@@ -734,14 +803,6 @@ Otherwise, \verb|exists| will use the iteration operation, \verb|next|, to
 continue iterating through choices for \verb|b| until it either finds an
 instantiation that is a supertype or runs out of instantiations.
 
- \begin{lstlisting}
-let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (initial b) with 
-  | true -> (match next a f with
-             | Some ns -> allexists a b ns 
-             | None -> true) 
-  | false -> false
-\end{lstlisting}
 
 The function \verb|allexists| is similar; it checks that for every
 instantiation of \verb|a|, there exists an instantiation of 
