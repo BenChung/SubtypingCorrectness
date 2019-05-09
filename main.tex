@@ -392,13 +392,53 @@ of the remaining choices with L-choices. Instead of indexing into
 the list of normal terms, our algorithm could instead perform this
 tree operation.
 
-However, there is a further simplification yet. If we examine the  linearized
-form of the choices-at-unions in this example, it looks very similar to a
-2-bit binary number where L is 0 and R is 1. Moreover, if we consider the
-effects of the tree choice alteration operation on the list of choices, we can
-see that the analogy to binary numbers is clear. We find the rightmost
-L-choice, make it into a R-choice, and then make all following choices into
-L-choices.
+We can exploit this pattern to let us iterate through the list of 
+base types that we would otherwise need to get from normalization.
+Iteration from one state to the next involves three key steps:
+\begin{itemize}
+\item Stepping, identifying the choice that needs to be updated.
+\item Truncation, eliminating old and invalid choices.
+\item Padding, inserting new choices so that the new type is fully defined
+\end{itemize}
+
+Outline:
+
+we can generalize this pattern into two steps:
+
+first step: we flip the deepest L-choice into an R-choice.
+A lot like how we take the deepest 0 in a binary number and make it into a 1.
+
+second step: the remainder of the list is truncated
+this is because the old choices (which are all R-choices) following the
+flipped choice don't make sense anymore
+
+third step: we pad out the list with L-choices until we end up with a valid type again
+we choose L-choices because the algorithm sweeps left-to-right. This is like filling the
+binary number out with zeros; we could go the other way, which is essentially like decrementing 
+in binary.
+
+using this, we can define an initial state: the all-left configuration. It's like all zeros in binary.
+
+can then use this to iterate through the type. in OCaml, we start with an all-left configuration made
+by padding the empty list. then step using next and pad.
+
+now we have a way to iterate through the list of base types we can now do subtyping with it
+
+section: subtyping
+
+subtyping with normalization precomputes the lists of base types. then it checks
+forall-exists between them. want to avoid precomputation
+
+it's equivalent to use our iterators. thus we can iterate using the exact same
+algortihm but without the memory overhead
+
+algorithm in ocaml consists of a base subtyping relation and two nested iterations
+over the left and right hand sides. the left hand iteration invokes the right hand
+iteration, searching for a right element that is a supertype of the left element.
+if all left elements have a right element which is a supertype, then subtyping holds.
+if there is some left element such that all right elements are not a supertype then 
+the types are not subtypes.
+
 
 \begin{figure}
 \centering
