@@ -184,7 +184,7 @@ Ciancaglini~\cite{barbanera1991intersection} and Pierce~\cite{Pierce1991} uses
 normalization to decide distributive subtyping between union types, while
 Vouillon~\cite{Vouillon04} does not handle distributivity. Normalization
 entails rewriting all types into their disjunctive normal form (DNF), as
-unions of union-free types, \emph{before} building the derivation. This lifts
+unions of union-free (or base) types, \emph{before} building the derivation. This lifts
 all choices at unions up to the top level, avoiding the structural
 entanglements that cause the above issue. The correctness of this rewriting
 step is justified by the semantic-subtyping denotational
@@ -205,7 +205,7 @@ bigger} types. Real Julia code has types like the following~\cite{DBLP:NardelliB
 \end{verbatim}
 \end{small}
 
-\noindent The normal form for this type has 32,768 terms, making it impractical
+\noindent The normal form for this type has 32,768 constituent base types, making it impractical
 to store or to compute with.
 
 The second drawback of normalisation is that it does not interact well with
@@ -417,7 +417,7 @@ The second phase is truncation. Unlike a binary number, the maximum length of
 a path depends on the choices made within that path and the structure of the
 type AST. Changing a choice higher in the type AST then can invalidate  any
 choices made later. If we consider, for example, the type
-$\union{\union{p_1,p_2},p_3}$, the choice lists LL, LR, and R are valid; RR is
+$\union{\union{p_1}{p_2}}{p_3}$, the choice lists LL, LR, and R are valid; RR is
 not. To avoid this, we need to truncate the choices that follow the toggled
 choice. In the example here, the choice list LR would evolve to R because the
 list is truncated following the toggle of the first L to an R.
@@ -514,6 +514,22 @@ Prim. Finally, the overarching step function \lstinline{next} is the composition
 of \lstinline{pad} and \lstinline{step}.
 
 \subsection{Subtyping}
+
+As discussed previously, it's easy to decide subtyping if given the normalized
+form of both inputs. The algorithm loops through each of the base types on the
+left looking for a supertype among the right-hand base types. The problem that
+we described, however, was that in requiring the normalized form this
+algorithm needs exponential space. However, armed with the abovementioned
+iterator state, we can now use the same algorithm but without the space
+explosion.
+
+The idea is that instead of iterating through each list element by element
+we can iterate using the structural iterators to represent the base types
+being examined in each iteration. As long as the iterators are equivalent to
+the lists of base types produced by normalization, the execution is identical.
+
+
+
 Outline:
 
 subtyping with normalization precomputes the lists of base types. then it checks
@@ -581,6 +597,77 @@ use the exact same algorithm with only minor changes. As before, our algorithm
 needs to find a supertype on the right for every base type on the left.
 
 
+\begin{lstlisting}
+type res =
+ | IsSub of choice list * choice list
+ | NotSub
+\end{lstlisting}
+
+\begin{lstlisting}
+let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
+ match (a,b,f,e) with
+ | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
+ | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
+    (match sub ta1 tb1 f e with
+     | IsSub(f', e') -> sub ta2 tb2 f' e'
+     | NotSub -> NotSub)
+ | (Union(a1,a2),b,d::f',e) -> 
+       sub (match d with Left->a1 | Right->a2) b f' e
+ | (a,Union(b1,b2),f,d::e') -> 
+       sub a (match d with Left->b1 | Right->b2) f e'
+\end{lstlisting}
+
+The first ``trick'' that we take advantage of is the fact that we never need
+to actually compute the base types we're subtyping. Instead, we can subtype
+the original AST in the context of the choice lists for each side. This is
+implemented in the above \lstinline{sub} function. It takes the full type ASTs
+being subtyped as well as the forall (\lstinline{f}) and exists
+(\lstinline{e}) choice lists, then computes subtying between the baes types 
+implied by the given choices in the given type AST. It does so by using the 
+given choice lists whenever it encounters a union, thereby eliminating all
+unions from the types under consideration.
+
+Armed with this, all that remains to decide subtyping in a space-efficient
+manner is to compactly iterate over the choice lists. As described previously,
+we need to iterate over every base type on the left (forall) and find if there
+exists a supertype on the right (exists). We do this with two recursive
+functions:
+
+
+\begin{lstlisting}
+let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
+ match sub a b f e with 
+  | IsSub(_,_) -> true 
+  | NotSub -> 
+     (match next b e with
+      | Some ns -> exists a b f ns 
+      | None -> false) 
+\end{lstlisting}
+
+ \begin{lstlisting}
+let rec allexists(a:typ)(b:typ)(f:choice list) =
+  match exists a b f (initial b) with 
+  | true -> (match next a f with
+             | Some ns -> allexists a b ns 
+             | None -> true) 
+  | false -> false
+\end{lstlisting}
+
+
+\begin{lstlisting}
+let subtype(a:typ)(b:typ) = allexists a b (initial a)
+\end{lstlisting}
+
+Each of the functions \lstinline{exists} and \lstinline{allexists} implements
+one ``side'' of the search. \lstinline{exists} is given a single left-hand choice 
+list (and thus correspondant base type) and searches the right hand side's choice lists
+to see if there is a supertype of the given left-hand type. \lstinline{allexists} iterates
+through every type on the left using \lstinline{exists} to ensure that a supertype exists
+on the right hand side. Finally, \lstinline{subtype} simply calls \lstinline{allexists} with
+the initial iterator state.
+
+
+
 
 \begin{figure}[h]
 \center
@@ -628,49 +715,6 @@ We again present an implementation of this algorithm in OCaml. The core operatio
 subtyping is subtyping between base types, which we implement by implicitly sub-setting
 the full type AST given the lists of choices made on each side.
 
-\begin{lstlisting}
-type res =
- | IsSub of choice list * choice list
- | NotSub
-\end{lstlisting}
-
-\begin{lstlisting}
-let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
- match (a,b,f,e) with
- | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
- | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
-    (match sub ta1 tb1 f e with
-     | IsSub(f', e') -> sub ta2 tb2 f' e'
-     | NotSub -> NotSub)
- | (Union(a1,a2),b,d::f',e) -> 
-       sub (match d with Left->a1 | Right->a2) b f' e
- | (a,Union(b1,b2),f,d::e') -> 
-       sub a (match d with Left->b1 | Right->b2) f e'
-\end{lstlisting}
-
-\begin{lstlisting}
-let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
- match sub a b f e with 
-  | IsSub(_,_) -> true 
-  | NotSub -> 
-     (match next b e with
-      | Some ns -> exists a b f ns 
-      | None -> false) 
-\end{lstlisting}
-
- \begin{lstlisting}
-let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (initial b) with 
-  | true -> (match next a f with
-             | Some ns -> allexists a b ns 
-             | None -> true) 
-  | false -> false
-\end{lstlisting}
-
-
-\begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (initial a)
-\end{lstlisting}
 
 
 
