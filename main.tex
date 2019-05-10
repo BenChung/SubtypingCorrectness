@@ -21,18 +21,13 @@
 \titlerunning{Subtyping union types and covariant tuples}
 
 \author{Benjamin Chung}{Northeastern University}{}{}{}%mandato
-\author{Francesco Zappa Nardelli}{INRIA}{}{}{}
-\author{Jan Vitek}{Northeastern University \& Czech Technical University}{}{}{}
-
+\author{Francesco Zappa Nardelli}{INRIA}{}{}{} \author{Jan
+  Vitek}{Northeastern University \& Czech Technical University in
+ Prague}{}{}{}
 \authorrunning{B. Chung, F. Zappa Nardelli, J. Vitek}
-
 \Copyright{Benjamin Chung, Francesco Zappa Nardelli, Jan Vitek}%mandatory, plea
 \ccsdesc[500]{Theory of computation~Type theory}
-% mandatory: Please choose ACM 2012 classifications from https://www.acm.org/publications/class-2012 or https://dl.acm.org/ccs/ccs_flat.cfm . E.g., cite as "General and reference $\rightarrow$ General literature" or \ccsdesc[100]{General and reference~General literature}. 
-
 \keywords{Type systems, Subtyping, Union types}
-
-%\hideLIPIcs
 
 \lstset{
  language=caml,
@@ -136,13 +131,14 @@ long time. Based on Vouillon~\cite{Vouillon04}, the following is a typical
 deductive system:
 
 \vspace{-3mm}{\small\begin{mathpar}
-\inferrule{t' \sub t \\ t'' \sub t}{\union{t'}{t''} \sub t}
+\inferrule[allexist]{
+   t' \sub t \\ t'' \sub t}{\union{t'}{t''} \sub t}
 
-\inferrule{t \sub t'}{t \sub \union{t'}{t''}}
+\inferrule[existL]{t \sub t'}{t \sub \union{t'}{t''}}
 
-\inferrule{t \sub t''}{t \sub \union{t'}{t''}}
+\inferrule[existR]{t \sub t''}{t \sub \union{t'}{t''}}
 
-\inferrule{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
+\inferrule[tuple]{t_1 \sub t'_1 \\ t_2 \sub t'_2}{\tuple{t_1, t_2} \sub \tuple{t'_1, t'_2}}
 \end{mathpar}}
 \vspace{-3mm}
 
@@ -233,20 +229,23 @@ constructors and {existential types}. This is illustrated by the following judgm
 \]}\vspace{-3mm}
 %
 
-\noindent This judgment holds if we set the existential {\small$T=\union{t}{t'}$}.
+\noindent 
+This judgment holds if we set the existential {\small$T=\union{t}{t'}$}.
 Since all types are in weak normal form, an algorithm based on the standard
-system of judgment rules would strip off the array type constructors and proceed.
-However, since type constructors are invariant on their arguments, it must first test
-that the relation holds in the original order (e.g. that $\union{\tuple{t}}{\tuple{t}} <: \tuple{T}$) 
-and in the reverse order (that $\tuple{T} <: \union{\tuple{t}}{\tuple{t'}}$). It is in
-this combined check that we run into problems.
+system of judgment rules would strip off the array type constructors and
+proceed.  However, since type constructors are invariant on their arguments,
+it must first test that the relation holds in the original order (e.g. that
+$\union{\tuple{t}}{\tuple{t}} <: \tuple{T}$) and in the reverse order (that
+$\tuple{T} <: \union{\tuple{t}}{\tuple{t'}}$). It is in this combined check
+that we run into problems.
 
-The original order subtype check can be concluded without issue, producing the
-constraint on $T$ {\small$\union{t}{t'} <: T$}. However, this constraint on $T$ is 
-stored for checking the reversed direction of subtyping, which is where the problems
-arise. When we check the opposite subtype order, we end up having to prove that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$} and in turn
-either {\small$T<:t$} or {\small$T<:t'$}. All of these are unprovable
-under the assumption that {\small$\union{t}{t'} <: T$}.
+The original order subtype check can be concluded without issue, producing
+the constraint on $T$ {\small$\union{t}{t'} <: T$}. However, this constraint
+on $T$ is stored for checking the reversed direction of subtyping, which is
+where the problems arise. When we check the opposite subtype order, we end
+up having to prove that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}
+and in turn either {\small$T<:t$} or {\small$T<:t'$}. All of these are
+unprovable under the assumption that {\small$\union{t}{t'} <: T$}.
 
 The key to derive a successful judgment for this relation is to rewrite the
 right-to-left check into {\small$\tuple{T}<:\tuple{\union{t}{t'}}$}, which is
@@ -273,169 +272,137 @@ standard semantic subtyping model.
 
 \section{A space-efficient subtyping algorithm}
 
-This section presents a simplified version of Julia's subtype algorithm.  To
-better align with our Coq proof, the algorithm is implemented in Ocaml.  For
-clarity, we omit some optimizations (they are discussed at the end of the
-section). We focus on a core type language composed of binary unions,
-covariant binary tuples, and primitive types:
+Let us focus on a core type language consisting of binary unions, binary
+tuples and primitive types ranged over by $p_1 \dots p_n$ where primitive
+type subtyping is identity, $p_i <: p_i$.
 
+\medskip
 \begin{lstlisting}
-type typ =
- | Prim of int
- | Tuple of typ * typ
- | Union of typ * typ
+type typ =   Prim of int  | Tuple of typ * typ  | Union of typ * typ
 \end{lstlisting}
+\medskip
 
-Prim types are singletons with respect to subtyping, and are ranged over by
-\(p_1, ... p_n\).
+\noindent
+Using normalization to determine subyping entails rewriting tuples so that
+unions occur at the top level. Consider the following query:
 
-\subsection{Overview}
+\medskip
+$\union{ \tuple{p_1,p_2}}{\tuple{p_2,p_3}} ~~ <:~~  \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}$
+\medskip
 
-Consider the following query:
+\noindent
+The term on the left is normal form, but the right term  needs to be
+rewritten as follows:
 
-\[
-\union{ \tuple{p_1,p_2}}{\tuple{p_2,p_3}}  <:  \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}
-\]
+\medskip
+$\union{ \tuple{p_2,p_3}}
+  {\union{ \tuple{p_2,p_2}}
+    {\union{ \tuple{p_1,p_3}}
+           {\tuple{p_1,p_2}}}}$
+\medskip
 
-Are these types subtypes? Under the semantic definition of subtyping, we need
-to ensure that every value denoted on the left hand side is present on the
-right. It is easy to decide the subset relation for primitive types and tuples, 
-as each denotes a simple fixed set, but unions induce difficulty. Using normalization,
-we can reduce subtyping between types using unions to repeated subtyping of tuples and
-primitives by looking at each type as a list of its basic types.
+\noindent
+Given normalized types, one more step of rewritting gives us union-free
+lists of tuples,
 
-To do so, we can write out in a list every union-less type we can make out of our original type.
-For every union in the type under consideration, we can select ``which way'' it went, be it left
-or right. We construct a list of normalized choices by taking every such choice and remembering
-what types we ended up with. On the left hand side, the union of tuples gives us two clear
-choices, while the right hand side gives us four:
+\medskip
+$\ell_1 = \{  \tuple{p_1,p_2}, \tuple{p_2,p_3}  \}$
+\medskip
 
-\[
-\begin{array}{r|l}
-\text{LHS} & \text{RHS} \\
-\hline
-\text{l1:} \tuple{p_1,p_2} & \text{r1:} \tuple{p_2,p_3}\\
-\text{l2:} \tuple{p_2,p_3} & \text{r2:} \tuple{p_2,p_2}\\
-                    & \text{r3:} \tuple{p_1,p_3}\\
-                    & \text{r4:} \tuple{p_1,p_2}\\
-\end{array}
-\]
+\noindent and
 
-Using these lists, we can decide semantic subtyping between these two
-types. To do so, we need to check that for every element on the left-hand-side,
-there is an element on the right-hand-side that is a supertype. We can 
-see that l1 is a subtype of r4, and that l2 is a subtype of r1, so the
-semantic subtyping relationship between these two types holds.
+\medskip
+$\ell_2 = \{  \tuple{p_2,p_3}, \tuple{p_2,p_2}, \tuple{p_1,p_3}, 
+          \tuple{p_1,p_2} \}$.
+\medskip
 
-To decide subtyping algorithmically we follow the same principle. We
-use two functions: allexists, which iterates through every left-hand-side
-choice and calls the second function, exists, which finds a right-hand-side
-type that is a supertype of the chosen left-hand-side type. Each function
-holds as state a position within the sequence of tuples, and iterates through 
-each list as required.
+\noindent determining whether $\ell_1 <: \ell_2$ boils down to following the
+above defined subtyping rules: for each element in $\ell_1$ {\sc
+  [allexist]}, there should be an element in $\ell_2$ {\sc [existL/R]} such
+that the tuples are subtypes {\sc [tuple]}.
 
-This algorithm works to decide subtyping; however, we needed to normalize
-the types to lists of clauses first, which as previously mentioned can consume
-considerable amounts of space. Instead of materializing the normalized forms
-of each type we can iterate through the same space by walking over the
-ASTs of the type terms. In this manner, we achieve the same effect---iteration
-over all possible normalized forms---but without precomputing the list of normal forms.
+The intuition of Julia's subtyping algorithm is that it is possible to
+iterate over the original type terms and visit every one of the elements of
+$\ell_1$ and $\ell_2$ without ever having to materialize those sets. The
+remainder of this section explains how this is done in Ocaml syntax before
+we explain our mechanized proof.
 
-We can view the current position in the list as state of an iterator.
-Equivalently to ``position in normalized list'' as iterator state,
-we can use ``choices within type AST'' as our state; in this representation,
-we remember each choice made within the type AST (i.e. every union encountered), 
-which then defines a specific term in the normalized equivalent of the original type.
+\subsection{Iteration}
 
-Consider, for example,
-\[
- \tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}
-\]
-The AST for this type is the following tree:
+Given a type term such as the following,
 
-\includegraphics[scale=0.5]{figures-gen/exmp1.pdf}
+\medskip
+$\tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}$
+\medskip
 
-We can recover the types in the normalized sequence from the choices made at
-each union in this tree. Position 1 in the normalized list can be encoded as a
-left choice at the first union, then a left choice at the second union. Using
-the order over trees defined by an inorder depth-first traversal, we could
-call this taking the first and second lefts, or left left, or LL for short.
-Similarly, note that position 2 corresponds to taking the left choice at the
-first union, then the right choice at the second, or equivalently LR, while
-position 3 and 4 in the normalized list are equivalent to RL and RR,
-respectively. Each letter in each of the string represents one choice point,
-and we can reconstruct the list of normalized types purely from the strings of
-choices made at unions in the AST.
+\noindent
+we are looking for an iteration sequence that will yield the following tuples
 
-This equivalence between indices into terms from normalization and choices in
-the type tree is interesting. If we draw out each of the choices at unions that were made
-for each of the normalized terms in the type trees, we can see a pattern. In the following,
-we show the selected components of the type ASTs in blue, and the choice made at each union
-as an L for a left choice and R for a right choice above and to the left of the node.
+\medskip
+$  \tuple{p_2,p_3}, ~ \tuple{p_2,p_2}, ~ \tuple{p_1,p_3}, ~ \tuple{p_1,p_2}$.
+\medskip
 
-\begin{tabular}{r|c|c|c|c}
-Normal type:&$\tuple{p_2,p_3}$&$\tuple{p_2,p_2}$&$\tuple{p_1,p_3}$&$\tuple{p_1,p_2}$\\
-Index:&1 & 2 & 3 & 4\\
-Tree:&\includegraphics[scale=0.35]{figures-gen/exmp2a.pdf} &
-\includegraphics[scale=0.35]{figures-gen/exmp2b.pdf} &
-\includegraphics[scale=0.35]{figures-gen/exmp2c.pdf} &
-\includegraphics[scale=0.35]{figures-gen/exmp2d.pdf} \\
-Equivalent list:&LL&LR&RL&RR
+\noindent
+An alternative representation for the term is a tree, where each occurence
+of union node is a \emph{choice point}. The following tree has thus two
+choice points.
+
+\includegraphics[scale=.6]{figures/tree1.pdf}
+
+
+\noindent
+At each choice point we can go either left or right, making such a decision
+at each points leads to visit one particular tuple.
+
+\hspace{-4mm}{\small
+\begin{tabular}{@{}l@{~}ll@{~}ll@{~}ll@{~}l}
+\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree2.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_3} $ 
+&
+\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree3.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_2} $ 
+&\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree4.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_3} $ 
+&
+\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree5.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_2} $ 
 \end{tabular}
+}
 
-A pattern emerges! Each successive index into the list of
-normal terms corresponds to a simple operation on the previous
-choices at unions within the tree. To find the following normal 
-term from the choices of the prior term, it suffices to find the
-rightmost L-choice, turn it into a R-choice, and then replace all
-of the remaining choices with L-choices. Instead of indexing into
-the list of normal terms, our algorithm could instead perform this
-tree operation.
+\noindent 
+So, each tuple is uniquely determined from the original type term $t$ and a
+string of choices $c$. In the above example, iteration through the
+normalized, union-free, types is defined by the squence of strings {\tt LL},
+{\tt LR}, {\tt RL}, {\tt RR}. 
 
-We can exploit this pattern to let us iterate through the list of 
-base types that we would otherwise need to get from normalization.
-Iteration from one state to the next involves three key steps:
+We can iterate through the union-free tuple types that we would otherwise
+need to get from normalization in three steps:
 \begin{itemize}
-\item Stepping, identifying the choice that needs to be updated.
-\item Truncation, eliminating old and invalid choices.
-\item Padding, inserting new choices so that the new type is fully defined.
+\item Stepping: identifying the next choice points to flip.
+\item Truncation: deleting trailing choice points.
+\item Padding: resetting deleted choice to their initial values.
 \end{itemize}
-These three phases are shown in figure~\ref{fig:sstep}, which depicts
-a single evolution between the base types at indexes 2 and 3. 
+
 
 The first phase of the evolution, stepping, identifies the \emph{last
-alternative} choice that could be made within the type AST. Due to the
-order of normalization, we want to try to move further right within the
-AST; therefore, the stepping phase is trying to find the last L-choice
-to make into a R-choice. When considering the linearized representation
-of the choices on the tree, note that this is similar to incrementing a 
-binary number. Where binary number increment tries to identify the last 0
-to turn into a 1, the stepping phase identifies the last L-choice to turn
-into an R-choice.
+  alternative} choice that could be made within the type AST. Due to the
+order of normalization, we want to try to move further right within the AST;
+therefore, the stepping phase is trying to find the last L-choice to make
+into a R-choice. When considering the linearized representation of the
+choices on the tree, note that this is similar to incrementing a binary
+number. Where binary number increment tries to identify the last 0 to turn
+into a 1, the stepping phase identifies the last L-choice to turn into an
+R-choice.
 
-The second phase is truncation. Unlike a binary number, the maximum length of
-a path depends on the choices made within that path and the structure of the
-type AST. Changing a choice higher in the type AST then can invalidate  any
-choices made later. If we consider, for example, the type
-$\union{\union{p_1}{p_2}}{p_3}$, the choice lists LL, LR, and R are valid; RR is
-not. To avoid this, we need to truncate the choices that follow the toggled
-choice. In the example here, the choice list LR would evolve to R because the
-list is truncated following the toggle of the first L to an R.
+The second phase is truncation. Unlike a binary number, the maximum length
+of a path depends on the choices made within that path and the structure of
+the type AST. Changing a choice higher in the type AST then can invalidate
+any choices made later. If we consider, for example, the type
+$\union{\union{p_1}{p_2}}{p_3}$, the choice lists LL, LR, and R are valid;
+RR is not. To avoid this, we need to truncate the choices that follow the
+toggled choice. In the example here, the choice list LR would evolve to R
+because the list is truncated following the toggle of the first L to an R.
 
-\begin{figure}
-\centering
-\begin{tabularx}{\linewidth}{c|ccc}
-& Initial & Stepped & Padded\\
-Subtree: &
-\includegraphics[scale=0.50]{figures-gen/transex1.pdf} & 
-\includegraphics[scale=0.50]{figures-gen/transex2.pdf} & 
-\includegraphics[scale=0.50]{figures-gen/transex3.pdf} \\
-Choice List: & \underline{L}R & \underline{R} & \underline{R}L \\
-Effective Type: & \tuple{A,D} & \tuple{B,?} & \tuple{B,C} \\
-\end{tabularx}
-\caption{State-stepping operation for choice lists}
-\label{fig:sstep}
-\end{figure}
 
 Finally, the third phase is padding. Truncating invalid types in the previous
 phase may leave us with a set of choices that would include a union type in
@@ -451,54 +418,41 @@ AST.
 
 
 \noindent
-\begin{minipage}{\textwidth}
-\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-type choice = Left | Right
-
-
-
+type choice = L | R
 
 let rec toggle = function
   | [] -> []    
-  | Left::tl -> Right::tl
-  | Right::tl -> toggle tl
+  | L::tl -> R::tl
+  | R::tl -> toggle tl
 
 let step (l:choice list) =
-  let reversed = List.rev l in
-  match List.rev (toggle reversed) with
+  match List.rev (toggle (List.rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
 \end{lstlisting}
-\end{minipage}
-\begin{minipage}{0.5\textwidth}
+
 \begin{lstlisting}
-let rec pad(a:typ)
-           (l:choice list) = 
+let rec pad(a:typ)(l:choice list) = 
 match (a,ls) with
  | (Prim i,_) -> ([],ls)
  | (Tuple(t1,t2) _) -> 
     let (hd,tl) = pad t1 ls in
-    let (hd2,tl2) = pad t2 tl in
-    (hd @ hd2,tl2)
- | (Union(l,r),Left::rs) -> 
-   let (hd,tl) = pad l rs in 
-   (Left::hd,tl)
- | (Union(l,r),Right::rs) -> 
-   let (hd,tl) = pad r rs in 
-   (Right::hd,tl)
- | (Union(l,r),[]) -> 
-   (Left::initial l,[])
+    let (hd2,tl2) = pad t2 tl in (hd @ hd2,tl2)
+ | (Union(l,r),L::rs) -> 
+    let (hd,tl) = pad l rs in (L::hd,tl)
+ | (Union(l,r),R::rs) -> 
+    let (hd,tl) = pad r rs in (R::hd,tl)
+ | (Union(l,r),[]) -> (L::initial l,[])
 \end{lstlisting}
-\end{minipage}
 
-\begin{minipage}{0.96\textwidth}
+
+
 \begin{lstlisting}
-let rec next(a:typ)(l:choice list) =
-  option_map fst (option_map (pad a) (step l))
+let rec next(a:typ)(l:choice list) = 
+          option_map fst(option_map(pad a)(step l))
 \end{lstlisting}
-\end{minipage}
-\end{minipage}
+
 
 To illustrate the implementation of this stepping system, we show its
 implementation in OCaml above. The first two phases of the evolution are
@@ -507,11 +461,11 @@ the padding phase is implemented in the \lstinline{pad} function.
 \lstinline{toggle} and \lstinline{step} work by reversing the list, finding
 the first L-choice, turning it into an R-choice, forgetting about all
 predecessors, and reversing the list again. This toggles the last L-choice
-(stepping) and deletes all subsequent choices (truncation). Padding in 
+(stepping) and deletes all subsequent choices (truncation). Padding in
 \lstinline{pad} is structural, and identifies the point at which the given
-choice list runs out after which it will insert L-choices until it reaches a 
-Prim. Finally, the overarching step function \lstinline{next} is the composition
-of \lstinline{pad} and \lstinline{step}.
+choice list runs out after which it will insert L-choices until it reaches a
+Prim. Finally, the overarching step function \lstinline{next} is the
+composition of \lstinline{pad} and \lstinline{step}.
 
 \subsection{Subtyping}
 
@@ -612,9 +566,9 @@ let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
      | IsSub(f', e') -> sub ta2 tb2 f' e'
      | NotSub -> NotSub)
  | (Union(a1,a2),b,d::f',e) -> 
-       sub (match d with Left->a1 | Right->a2) b f' e
+       sub (match d with L ->a1 | R ->a2) b f' e
  | (a,Union(b1,b2),f,d::e') -> 
-       sub a (match d with Left->b1 | Right->b2) f e'
+       sub a (match d with L ->b1 | R ->b2) f e'
 \end{lstlisting}
 
 The first ``trick'' that we take advantage of is the fact that we never need
