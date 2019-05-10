@@ -349,7 +349,6 @@ choice points.
 
 \includegraphics[scale=.6]{figures/tree1.pdf}
 
-
 \noindent
 At each choice point we can go either left or right, making such a decision
 at each points leads to visit one particular tuple.
@@ -357,17 +356,14 @@ at each points leads to visit one particular tuple.
 \hspace{-4mm}{\small
 \begin{tabular}{@{}l@{~}ll@{~}ll@{~}ll@{~}l}
 \begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree2.pdf} 
-\end{minipage} &  $ =   \tuple{p_2,p_3} $ 
-&
+\end{minipage} &  $ =   \tuple{p_2,p_3} $ &
 \begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree3.pdf} 
 \end{minipage} &  $ =   \tuple{p_2,p_2} $ 
 &\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree4.pdf} 
-\end{minipage} &  $ =   \tuple{p_2,p_3} $ 
-&
+\end{minipage} &  $ =   \tuple{p_2,p_3} $ &
 \begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree5.pdf} 
 \end{minipage} &  $ =   \tuple{p_2,p_2} $ 
-\end{tabular}
-}
+\end{tabular}}
 
 \noindent 
 So, each tuple is uniquely determined from the original type term $t$ and a
@@ -376,48 +372,16 @@ normalized, union-free, types is defined by the squence of strings {\tt LL},
 {\tt LR}, {\tt RL}, {\tt RR}. 
 
 We can iterate through the union-free tuple types that we would otherwise
-need to get from normalization in three steps:
-\begin{itemize}
-\item Stepping: identifying the next choice points to flip.
-\item Truncation: deleting trailing choice points.
-\item Padding: resetting deleted choice to their initial values.
-\end{itemize}
+need to get from normalization by calling {\tt next} with a type term and a
+choice list. The initial choice list (all {\tt L}s) is obtained by function
+{\tt initial} given a type term.
+
+\begin{lstlisting}
+let rec next(a:typ)(l:choice list) = 
+          option_map fst (option_map (pad a) (step l))
+\end{lstlisting}
 
 
-The first phase of the evolution, stepping, identifies the \emph{last
-  alternative} choice that could be made within the type AST. Due to the
-order of normalization, we want to try to move further right within the AST;
-therefore, the stepping phase is trying to find the last L-choice to make
-into a R-choice. When considering the linearized representation of the
-choices on the tree, note that this is similar to incrementing a binary
-number. Where binary number increment tries to identify the last 0 to turn
-into a 1, the stepping phase identifies the last L-choice to turn into an
-R-choice.
-
-The second phase is truncation. Unlike a binary number, the maximum length
-of a path depends on the choices made within that path and the structure of
-the type AST. Changing a choice higher in the type AST then can invalidate
-any choices made later. If we consider, for example, the type
-$\union{\union{p_1}{p_2}}{p_3}$, the choice lists LL, LR, and R are valid;
-RR is not. To avoid this, we need to truncate the choices that follow the
-toggled choice. In the example here, the choice list LR would evolve to R
-because the list is truncated following the toggle of the first L to an R.
-
-
-Finally, the third phase is padding. Truncating invalid types in the previous
-phase may leave us with a set of choices that would include a union type in
-the result. To avoid this, we need to insert new choices for whatever structure
-remains in the type AST from our new position. Due to our iteration order of 
-left-to-right, the new choices will be L-choices.
-
-Based on this logic, we can also define an initial state: the all-L-choice
-configuration. Using the same we traverse-left-to-right reasoning, it follows
-that we should start in the leftmost possible configuration of all L-choices.
-This can be accomplished by padding the empty list to conform to a given type
-AST.
-
-
-\noindent
 \begin{lstlisting}
 type choice = L | R
 
@@ -432,40 +396,22 @@ let step (l:choice list) =
   | hd::tl -> Some(hd::tl)
 \end{lstlisting}
 
+
 \begin{lstlisting}
 let rec pad(a:typ)(l:choice list) = 
-match (a,ls) with
- | (Prim i,_) -> ([],ls)
- | (Tuple(t1,t2) _) -> 
-    let (hd,tl) = pad t1 ls in
-    let (hd2,tl2) = pad t2 tl in (hd @ hd2,tl2)
- | (Union(l,r),L::rs) -> 
-    let (hd,tl) = pad l rs in (L::hd,tl)
- | (Union(l,r),R::rs) -> 
-    let (hd,tl) = pad r rs in (R::hd,tl)
- | (Union(l,r),[]) -> (L::initial l,[])
+  match (a,ls) with
+   | (Prim i,_) -> ([],ls)
+   | (Tuple(t1,t2) _) -> 
+      let (hd,tl) = pad t1 ls in
+      let (hd2,tl2) = pad t2 tl in (hd @ hd2,tl2)
+   | (Union(l,r),L::rs) -> 
+      let (hd,tl) = pad l rs in (L::hd,tl)
+   | (Union(l,r),R::rs) -> 
+      let (hd,tl) = pad r rs in (R::hd,tl)
+   | (Union(l,r),[]) -> (L::initial l,[])
 \end{lstlisting}
 
 
-
-\begin{lstlisting}
-let rec next(a:typ)(l:choice list) = 
-          option_map fst(option_map(pad a)(step l))
-\end{lstlisting}
-
-
-To illustrate the implementation of this stepping system, we show its
-implementation in OCaml above. The first two phases of the evolution are
-implemented in the \lstinline{toggle} and \lstinline{step} functions, while
-the padding phase is implemented in the \lstinline{pad} function.
-\lstinline{toggle} and \lstinline{step} work by reversing the list, finding
-the first L-choice, turning it into an R-choice, forgetting about all
-predecessors, and reversing the list again. This toggles the last L-choice
-(stepping) and deletes all subsequent choices (truncation). Padding in
-\lstinline{pad} is structural, and identifies the point at which the given
-choice list runs out after which it will insert L-choices until it reaches a
-Prim. Finally, the overarching step function \lstinline{next} is the
-composition of \lstinline{pad} and \lstinline{step}.
 
 \subsection{Subtyping}
 
@@ -638,13 +584,14 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
 let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
-Each of the functions \lstinline{exists} and \lstinline{allexists} implements
-one ``side'' of the search. \lstinline{exists} is given a single left-hand choice 
-list (and thus correspondant base type) and searches the right hand side's choice lists
-to see if there is a supertype of the given left-hand type. \lstinline{allexists} iterates
-through every type on the left using \lstinline{exists} to ensure that a supertype exists
-on the right hand side. Finally, \lstinline{subtype} simply calls \lstinline{allexists} with
-the initial iterator state.
+Each of the functions \lstinline{exists} and \lstinline{allexists}
+implements one ``side'' of the search. \lstinline{exists} is given a single
+left-hand choice list (and thus correspondant base type) and searches the
+right hand side's choice lists to see if there is a supertype of the given
+left-hand type. \lstinline{allexists} iterates through every type on the
+left using \lstinline{exists} to ensure that a supertype exists on the right
+hand side. Finally, \lstinline{subtype} simply calls \lstinline{allexists}
+with the initial iterator state.
 
 In this manner, we can decide subtyping between types with distributive unions and tuples
 without requiring ahead-of-time normalization. However, we have not yet shown that this
