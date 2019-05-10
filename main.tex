@@ -398,47 +398,29 @@ Iteration from one state to the next involves three key steps:
 \begin{itemize}
 \item Stepping, identifying the choice that needs to be updated.
 \item Truncation, eliminating old and invalid choices.
-\item Padding, inserting new choices so that the new type is fully defined
+\item Padding, inserting new choices so that the new type is fully defined.
 \end{itemize}
+These three phases are shown in figure~\ref{fig:sstep}, which depicts
+a single evolution between the base types at indexes 2 and 3. 
 
-Outline:
+The first phase of the evolution, stepping, identifies the \emph{last
+alternative} choice that could be made within the type AST. Due to the
+order of normalization, we want to try to move further right within the
+AST; therefore, the stepping phase is trying to find the last L-choice
+to make into a R-choice. When considering the linearized representation
+of the choices on the tree, note that this is similar to incrementing a 
+binary number. Where binary number increment tries to identify the last 0
+to turn into a 1, the stepping phase identifies the last L-choice to turn
+into an R-choice.
 
-we can generalize this pattern into two steps:
-
-first step: we flip the deepest L-choice into an R-choice.
-A lot like how we take the deepest 0 in a binary number and make it into a 1.
-
-second step: the remainder of the list is truncated
-this is because the old choices (which are all R-choices) following the
-flipped choice don't make sense anymore
-
-third step: we pad out the list with L-choices until we end up with a valid type again
-we choose L-choices because the algorithm sweeps left-to-right. This is like filling the
-binary number out with zeros; we could go the other way, which is essentially like decrementing 
-in binary.
-
-using this, we can define an initial state: the all-left configuration. It's like all zeros in binary.
-
-can then use this to iterate through the type. in OCaml, we start with an all-left configuration made
-by padding the empty list. then step using next and pad.
-
-now we have a way to iterate through the list of base types we can now do subtyping with it
-
-section: subtyping
-
-subtyping with normalization precomputes the lists of base types. then it checks
-forall-exists between them. want to avoid precomputation
-
-it's equivalent to use our iterators. thus we can iterate using the exact same
-algortihm but without the memory overhead
-
-algorithm in ocaml consists of a base subtyping relation and two nested iterations
-over the left and right hand sides. the left hand iteration invokes the right hand
-iteration, searching for a right element that is a supertype of the left element.
-if all left elements have a right element which is a supertype, then subtyping holds.
-if there is some left element such that all right elements are not a supertype then 
-the types are not subtypes.
-
+The second phase is truncation. Unlike a binary number, the maximum length of
+a path depends on the choices made within that path and the structure of the
+type AST. Changing a choice higher in the type AST then can invalidate  any
+choices made later. If we consider, for example, the type
+$\union{\union{p_1,p_2},p_3}$, the choice lists LL, LR, and R are valid; RR is
+not. To avoid this, we need to truncate the choices that follow the toggled
+choice. In the example here, the choice list LR would evolve to R because the
+list is truncated following the toggle of the first L to an R.
 
 \begin{figure}
 \centering
@@ -455,30 +437,18 @@ Effective Type: & \tuple{A,D} & \tuple{B,?} & \tuple{B,C} \\
 \label{fig:sstep}
 \end{figure}
 
-Figure~\ref{fig:sstep} shows these two equivalent processes in detail,
-depicting the transition between the second to the third normal type. In
-the initial state, the tree form depicts us taking an L-choice at the first
-union and an R-choice at the second union; equivalently, the linear representation
-takes a L-choice than an R-choice. In the stepping operation, we notice that the
-final choice is an R-choice, so we cannot step it further; we continue back and
-identify that the first choice is an L-choice, so we turn it into an R-choice and
-remove all following choices. However, we have not made a choice at all unions
-anymore, as we no longer have a choice for the right union. To fix this, we make
-the L-choice at every union without a defined choice, equivalent to padding out
-the linearized representation with L-choices until it has a choice for every union.
+Finally, the third phase is padding. Truncating invalid types in the previous
+phase may leave us with a set of choices that would include a union type in
+the result. To avoid this, we need to insert new choices for whatever structure
+remains in the type AST from our new position. Due to our iteration order of 
+left-to-right, the new choices will be L-choices.
 
-To fully define this stepping function, we depict an implementation in OCaml.
-It uses the linear representation of the choices made in a type AST, operating
-over \lstinline{choice list}s and \lstinline{typ}s. A new iterator state may
-be constructed by using the \lstinline{pad} function to pad out the empty
-choice list with L-choices, making a L-choice for every union in the type.
-Stepping then works in the same two phases as above; the \lstinline{next}
-function first calls \lstinline{step}, which finds the final L-choice in the
-list, turns it into an R-choice, and truncates all remaining choices. Then,
-\lstinline{next} calls \lstinline{pad} to fill out the rest of the list with
-L-choices to ensure that all unions have a choice. If no L-choices remain in
-the list, \lstinline{step} will return \lstinline{None}, indicating that there
-are no more normal types to explore in the type being iterated.
+Based on this logic, we can also define an initial state: the all-L-choice
+configuration. Using the same we traverse-left-to-right reasoning, it follows
+that we should start in the leftmost possible configuration of all L-choices.
+This can be accomplished by padding the empty list to conform to a given type
+AST.
+
 
 \noindent
 \begin{minipage}{\textwidth}
@@ -525,10 +495,67 @@ match (a,ls) with
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
 let rec next(a:typ)(l:choice list) =
-  option_map fst (option_map (pad a) (last l))
+  option_map fst (option_map (pad a) (step l))
 \end{lstlisting}
 \end{minipage}
 \end{minipage}
+
+To illustrate the implementation of this stepping system, we show its
+implementation in OCaml above. The first two phases of the evolution are
+implemented in the \lstinline{toggle} and \lstinline{step} functions, while
+the padding phase is implemented in the \lstinline{pad} function.
+\lstinline{toggle} and \lstinline{step} work by reversing the list, finding
+the first L-choice, turning it into an R-choice, forgetting about all
+predecessors, and reversing the list again. This toggles the last L-choice
+(stepping) and deletes all subsequent choices (truncation). Padding in 
+\lstinline{pad} is structural, and identifies the point at which the given
+choice list runs out after which it will insert L-choices until it reaches a 
+Prim. Finally, the overarching step function \lstinline{next} is the composition
+of \lstinline{pad} and \lstinline{step}.
+
+\subsection{Subtyping}
+Outline:
+
+subtyping with normalization precomputes the lists of base types. then it checks
+forall-exists between them. want to avoid precomputation
+
+it's equivalent to use our iterators. thus we can iterate using the exact same
+algortihm but without the memory overhead
+
+algorithm in ocaml consists of a base subtyping relation and two nested iterations
+over the left and right hand sides. the left hand iteration invokes the right hand
+iteration, searching for a right element that is a supertype of the left element.
+if all left elements have a right element which is a supertype, then subtyping holds.
+if there is some left element such that all right elements are not a supertype then 
+the types are not subtypes.
+
+Endout.
+
+Figure~\ref{fig:sstep} shows these two equivalent processes in detail,
+depicting the transition between the second to the third normal type. In
+the initial state, the tree form depicts us taking an L-choice at the first
+union and an R-choice at the second union; equivalently, the linear representation
+takes a L-choice than an R-choice. In the stepping operation, we notice that the
+final choice is an R-choice, so we cannot step it further; we continue back and
+identify that the first choice is an L-choice, so we turn it into an R-choice and
+remove all following choices. However, we have not made a choice at all unions
+anymore, as we no longer have a choice for the right union. To fix this, we make
+the L-choice at every union without a defined choice, equivalent to padding out
+the linearized representation with L-choices until it has a choice for every union.
+
+To fully define this stepping function, we depict an implementation in OCaml.
+It uses the linear representation of the choices made in a type AST, operating
+over \lstinline{choice list}s and \lstinline{typ}s. A new iterator state may
+be constructed by using the \lstinline{pad} function to pad out the empty
+choice list with L-choices, making a L-choice for every union in the type.
+Stepping then works in the same two phases as above; the \lstinline{next}
+function first calls \lstinline{step}, which finds the final L-choice in the
+list, turns it into an R-choice, and truncates all remaining choices. Then,
+\lstinline{next} calls \lstinline{pad} to fill out the rest of the list with
+L-choices to ensure that all unions have a choice. If no L-choices remain in
+the list, \lstinline{step} will return \lstinline{None}, indicating that there
+are no more normal types to explore in the type being iterated.
+
 
 
 Through this mechanism, we have found two representations we can use as state
