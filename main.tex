@@ -627,6 +627,32 @@ implied by the given choices in the given type AST. It does so by using the
 given choice lists whenever it encounters a union, thereby eliminating all
 unions from the types under consideration.
 
+
+
+\begin{figure}[h]
+\center
+\begin{tabular}{cc|cc|c}
+\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
+\hline
+$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
+\hline
+\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
+    & \goodcell ${A} <: {A}$ \\
+\hline
+\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
+    & \badcell ${B} \not<: {A}$ \\
+\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
+    & \goodcell ${B} <: {B}$ \\
+\hline
+\end{tabular}
+
+\hspace{1em}
+
+$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
+
+\caption{Subtyping decision procedure example; should I continue to exist?}\label{fig:cfs}
+\end{figure}
+
 Armed with this, all that remains to decide subtyping in a space-efficient
 manner is to compactly iterate over the choice lists. As described previously,
 we need to iterate over every base type on the left (forall) and find if there
@@ -666,280 +692,9 @@ through every type on the left using \lstinline{exists} to ensure that a superty
 on the right hand side. Finally, \lstinline{subtype} simply calls \lstinline{allexists} with
 the initial iterator state.
 
-
-
-
-\begin{figure}[h]
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-    & \goodcell ${A} <: {A}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-    & \badcell ${B} \not<: {A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \goodcell ${B} <: {B}$ \\
-\hline
-\end{tabular}
-
-\hspace{1em}
-
-$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
-
-\caption{Subtyping decision procedure example}\label{fig:cfs}
-\end{figure}
-
-This algorithm works just as it did with the two lists of base types produced
-by normalization, but iterating over the choices implied by the type AST
-instead of the explicit base types. An example of its operation is shown in
-figure~\ref{fig:cfs}, which depicts its operation over a subtype query. In
-this example, both iterators start in the state ``L'', corresponding to the
-base type $\tuple{A}$ on the left and $\tuple{A}$ on the right. These are trivially
-subtypes, so this first case of the left-hand universal quantification is finished and
-the left-hand iterator may now be stepped to find the next. 
-
-Now that the left-hand iterator is taking the R choice, we restart the right-hand-side
-iterator to see if there exists a choice for the right-hand union that makes a supertype
-of the left-hand's $\tuple{B}$. The initial state for the right-hand-side is ``L'', 
-inducing the type $\tuple{A}$, which is not a supertype of $\tuple{B}$. We can continue
-in spite of this failure, as there remains one more step in the right-hand iterator, 
-inducing $\tuple{A}$ from the choice R. Thus, we have found a choice on the right for
-each choice on the left such that the left-hand base type is a subtype of the right-hand
-base type.
-
-We again present an implementation of this algorithm in OCaml. The core operation of
-subtyping is subtyping between base types, which we implement by implicitly sub-setting
-the full type AST given the lists of choices made on each side.
-
-
-
-
-\subsection{Unchanged.}
-The greatest difficulty of subtyping union types is searching the entire
-space of possible forall/exist quantifications of union types. We have seen
-that syntax-directed rules need ahead-of-time normalisation in the presence
-of covariant tuples.  The algorithm we propose for deciding subtyping works
-by iterating through choices made at unions along paths complete through the
-two types In this section, we will describe the implementation of the
-algorithm in OCaml and will present our proof of correctness in Coq in the
-following section. 
-
-
-We will begin by discussing a version of our algorithm that uses structurally-
-dependent iterators to explore types, then use that basis to describe our
-final space-efficient formulation and possible optimization thereof. 
-
-The fundamental operation the algorithm must accomplish is deciding if
-for every possible choice on the left if there exists some choice on the
-right such that subtyping holds. In order to do this, the algorithm iterates
-through each possible choice; both structural and space-efficient algorithms
-iterate over the same types in the same order, but do so using different yet 
-isomorphic internal representations.
-
-A structural iterator can be thought of as a sub-tree of the overarching type
-tree; we show these sub-trees in blue in figure~\ref{fig:cfs}. As there are no
-tuples in this example, the sub-trees are in fact paths for this case. It can
-be easily seen that we explore every path through the given type tree.
-
-The main question is: "how do we step from one sub-tree to the next?" In order
-to explore every sub-tree, our algorithm finds the deepest (top-to-bottom,
-left-to-right) union where it took the left branch and generates a new tree
-where it instead takes the right branch. This is seen in
-figure~\ref{fig:sstep}, where the deepest union in the initial state is the
-root; the algorithm flips this to take the right choice and then fills out the
-sub-tree with left choices until it reaches a  leaf.
-
-Storing sub-trees is expensive, however, as it requires storing a very
-incomplete tree structure. Our space-efficient representation encodes the
-same information as the sub-trees, but does so without itself being aware of
-the type being iterated over's structure. It linearizes the choices made to
-construct the sub-tree into a list, which can then be manipulated in a
-manner isomorphic to the sub-trees.
-
-Our space efficient representation stores choices that are made along a
-pre-order depth-first traversal of the iterated type tree. We can then
-manipulate this representation directly, avoiding the construction or
-storage of tree-structured iterators. The choices are stored as lists of
-\verb|choice|s which indicate which branch of a union type was taken:
-
-Lists of \verb|choice|s are isomorphic to the sub-tree representation when
-combined with the type being iterated over. To convert from sub-trees  to
-choice lists we simply conduct a preorder traversal of the sub-tree recording
-which choices were made along the way. Going from choice lists to sub-trees can
-be done by traversing the full type using the choice list while adding the traversed
-nodes to the sub-tree.
-
-Since our algorithm moves left-to-right through the type tree, we will
-initialize it with the state that takes the left choice at every union:
-
-
-Next, we define the step function. In the sub-tree intuition, we want to find
-the deepest union (left-to-right through tuples) in our current sub-tree where
-we made a left choice. In our resulting sub-tree, we take the alternative
-(right) choice at this deepest left choice, then make left choices until we
-reach a leaf. This operation is visualized in figure~\ref{fig:sstep}. The next
-state is defined as the one where we take the right choice at the deepest left-to-right
-left choice, then complete the sub-tree with left choices. To implement this,
-we can describe the operation in two steps: stepping and padding.
-
-When stepping, we identify the deepest left-to-right left choice and make it
-into a right then get rid of all following choices. In the sub-tree, we do
-this by simply working through the sub-tree from bottom-to-top, right-to-left
-until we find a choice where we went left and making that into a right. The
-following choices are then dropped from the sub-tree. The result of this is
-shown as the stepped subtree in figure~\ref{fig:sstep}.
-
-We can define an equivalent operation over choice lists. Since choice lists
-can be constructed from a sub-tree by iterating through them depth-first left-
-to-right, the bottom-to-top right-to-left search for a left choice in the
-subtree is equivalent to finding the \emph{last} left choice in the choice
-list. This choice is turned into a right and the remainder of the list is then
-truncated.
-
-To implement this, we first reverse the choice list, replace the first left
-in the reversed list with a right choice, and then throw away the choices that
-we've encountered in the reversed list so far. We then reverse the result to
-produce the new choice list in correct order. This is implemented in the
-\verb|last| function, shown below.
-
-
-
-The stepped state is incomplete, however. The first element of the tuple has
-now changed, but the second element is no longer defined by either the
-sub-tree or its equivalent choice list. In order to define this second
-element, we need to complete the sub-tree and pad out the choice list.
-
-The padding operation, taking the stepped state and producing the padded one, is determined
-by the direction of iteration. Since we go left-to-right through the type, we need to start
-any new iteration with making all left choices. Therefore, when presented by stepping with
-a partial sub-tree or choice list, we will pad it out with left choices until we have a complete
-tree or choice list.
-
-We show the padding operation for choice lists in OCaml, named
-\verb|pad|, below.  The correct padding is computed recursively from
-the type being iterated through by following the given choice list until it
-runs out, then adding lefts until all branches have been explored.
-
-
-Finally, the \verb|next| function combines these operations into
-a single step operation. It will take the deepest alternative choice
-at a union using \verb|last|, then add however many left
-choices are required to make the path valid using \verb|pad|. The
-complete \verb|next| operation shown in figure~\ref{fig:sstep} takes
-the choice stack L and the type $\union{A}{\union{B}{C}}$ and produces the
-choice stack RL. To do so, it takes the left choice, converts it to a right,
-then pads the list out with lefts until the path is valid with respect to the 
-type.
-
-\subsection{Subtyping}
-
-Now that we have defined the core iterator infrastructure, we show how it
-is used to decide subtyping queries. Subtyping is defined on a forall-exists
-basis, or for every choice on the left there must exist a choice on the right
-such that basic subtyping (in our case, subtyping without unions) holds. We
-use our iterator framework to implement this in the straightforward manner, 
-iterating through each choice on each side and checking if a relationship holds.
-
-To illustrate our algorithm, we use the  distributivity example from the
-introduction: $$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$$
-Figure~\ref{fig:cfs} shows our algorithm's internal state when using  both the
-structural and space- efficient representations when deciding subtyping for
-this type.
-
-The algorithm proceeds by maintaining two iterators (one for each side of
-the subtyping judgment) over choices-at-unions, checking that for every
-instantiation of the left hand type there exists an instantiation of the
-right hand type. We will first define the fundamental subtyping relation,
-used to decide subtyping relationships when given instantiations of the left
-and right hand types, then describe the algorithm that iterates through
-those types.
-
-\begin{lstlisting}
-type res =
- | IsSub of choice list * choice list
- | NotSub
-\end{lstlisting}
-
-The type \verb|res| represents the results of a single base subtype
-query. The query can either succeed, in which case it provides the unused
-portion of the input stacks, or fail.
-
-\begin{lstlisting}
-let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
- match (a,b,f,e) with
- | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
- | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
-    (match sub ta1 tb1 f e with
-     | IsSub(f', e') -> sub ta2 tb2 f' e'
-     | NotSub -> NotSub)
- | (Union(a1,a2),b,d::f',e) -> 
-       sub (match d with Left->a1 | Right->a2) b f' e
- | (a,Union(b1,b2),f,d::e') -> 
-       sub a (match d with Left->b1 | Right->b2) f e'
-\end{lstlisting}
-
-
-The function \verb|sub| is responsible for using two
-paths---one for the left and right hand sides of the subtyping
-relation---and checking that the subtype relation holds with respect
-to those paths. Given a basic type---an primitive or a tuple---it will
-either check equality or recur respectively. Given a union type, it
-will choose the component of the union type following the choice
-stacks and continue recursively. The function then returns an instance
-of \verb|res|, which gives the remaining choice stacks if
-successful or nothing otherwise.
-
-Finally, to check subtyping, we need to iterate through both types in the
-correct quantification order. Subtyping holds if, for every instantiation of
-the left there exists an instantiation of the right hand side of the
-subtyping judgment such that the subtype relation holds. To check this, we
-use a simple brute force approach sitting atop the choice stack iterator
-infrastructure described previously. The algorithm is implemented in two
-functions. \verb|exists| checks that there exists an instantiation of the
-right-hand-side for a given left-hand-side. \verb|allexists| uses
-\verb|exists| to check that for every instantiation of the LHS, there is an
-instantiation of the RHS such that the subtype relation holds.
-
-
-
-If the current choice---given by \verb|e|---is a supertype of the given
-\verb|a| according to \verb|sub|, then \verb|exists| has found a valid
-instantiation of \verb|b|. Therefore, there exists an instantiation of
-\verb|b| that is a supertype of \verb|a| and the result should be true.
-Otherwise, \verb|exists| will use the iteration operation, \verb|next|, to
-continue iterating through choices for \verb|b| until it either finds an
-instantiation that is a supertype or runs out of instantiations.
-
-
-The function \verb|allexists| is similar; it checks that for every
-instantiation of \verb|a|, there exists an instantiation of 
-\verb|b| such that subtyping holds. Checking for an instantiation
-of \verb|b| is done using \verb|exists|, while \verb|allexistits|
-maintains an iterator for \verb|a|.
-
-The operation of \verb|allexists| and \verb|exists| as well as their
-calls to \verb|sub| can be seen in figure~\ref{fig:cfs}. In the
-$\forall$ column, we see the current state maintained by \verb|allexists|.
-The $\exists$ column shows the state maintained by \verb|exists| as it is
-called by \verb|allexists|. In the example, for a forall-list of L, we an
-find an exists-list of L such that \verb|sub| holds. Similarly,
-for a forall-list of R, we can find an exists-list instantiation of R such
-that subtyping holds. Therefore, for every instantaition of the left-hand-side,
-there exists an instantiation of the right-hand-side such that subtyping holds
-and subtyping holds for the type as a whole.
-
-\begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (initial a)
-\end{lstlisting}
-
-Finally, \verb|subtype| checks if \verb|a| is a subtype of \verb|b|.
-It seeds \verb|allexists| with the initial choice for \verb|a|'s
-iterator, which then checks if for every instantiation of \verb|a|
-there exists an instantiation of \verb|b| such that subtyping holds.
+In this manner, we can decide subtyping between types with distributive unions and tuples
+without requiring ahead-of-time normalization. However, we have not yet shown that this
+algorithm is correct, which will be the topic of the following section.
 
 \subsection{Further optimizations}
 
