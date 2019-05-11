@@ -609,17 +609,17 @@ of the choice stacks themselves.
 
 \section{Correctness and completeness}
 
-To prove correctness of our algorithm, we begin by formally specifying
-correctness for subtyping. We then show that two subtyping algorithms---
-based on structural iterators and choice lists---are correct
-with respect to this definition in Coq.
+Our proof strategy for our algorithms broadly follows the above presentation.
+We begin by defining subtyping using a denotational semantics, and show that
+normalization based subtyping is trivially correct in this framework. We then
+describe and characterize both tree-based and list-based iterators and use
+them to prove the same correctness theorem as the normalization based
+subtyping provides.
 
-We base our definition of subtyping on a denotational semantics for types. 
-We reduce types in the type language including unions to sets of types
-in the type language without unions through a simple transformation. 
+The denotational semantics we use for types is as follows:
 
 \begin{align*}
-\denotes{\xt{A}} &= \{A\} \\
+\denotes{p_i} &= \{p_i\} \\
 \denotes{\union{t_1}{t_2}} &= \denotes{t1} \cup \denotes{t2} \\
 \denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} | t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
 \end{align*}
@@ -636,20 +636,28 @@ A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \deno
 \end{definition}
 
 Proving a subtyping algorithm sound and complete is therefore equivalent to
-producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; that is, is able to decide whether two types are
+producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; 
+that is, the function is able to decide whether two types are
 subtypes or not.
 
-We will begin by describing and proving correct a version of the algorithm
-that uses explicit type-structural iterators. We will then show the choice
-stack-based algorithm correct by proving equivalence between structural
-iterators and choice stacks. In doing so, we will derive an induction
-principle for structural iterators (and, as an extension, for choice stacks).
+Subtyping with normalization is trivially complete in this framework; the normalization
+procedure computes the full set of types denoted by each side and then directly checks
+set inclusion.
+
+However, what remains to be shown is that the iterator system is equivalent to normalization.
+We do so by first proving that tree-based iterators, iterators that assign choices to specific
+nodes within the type AST, iterate over the list of base types that normalization produces. We
+then prove the same property of list-based iterators by equivalence to tree-based iterators, and
+conclude by proving that the three methods all can be used to decide subtyping in a sound and complete
+manner.
 
 \subsection{Iterators}
 
-The Coq iterator-based implementation is directly equivalent (as will be shown
-later) to the choice-stack based implementation presented previously in OCaml.
-However, it retains type structure information inside of the iterator state.
+As described previously, we can use choices directly asigned to AST tree nodes
+as our iterator state. We do so in Coq using so-called structural iterators,
+which iterate over the structure of the type AST. By retaining the structure
+in the iterator, we make it explicit which component of the type is having a
+choice assigned to it. These iterators are defined as the following:s
 
 \begin{small}\begin{verbatim}
 Inductive TypeIterator: type -> Set :=
