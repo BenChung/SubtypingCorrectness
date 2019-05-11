@@ -376,22 +376,28 @@ need to get from normalization by calling {\tt next} with a type term and a
 choice list. The initial choice list (all {\tt L}s) is obtained by function
 {\tt initial} given a type term.
 
+\begin{lstlisting}
+let rec next(l:choice list) = step l          
+\end{lstlisting}
+
 
 \begin{lstlisting}
 type choice = L | R
 
-let rec done = function
-  | [] -> true
-  | R::tl -> done tl
-  | L::tl -> false
-                     
 let rec toggle = function
-  | [] -> []
+  | [] -> []    
   | L::tl -> R::tl
-  | R::tl -> L::(toggle tl)
+  | R::tl -> R::(toggle tl)
+
+let rec clear = function 
+  | [] -> []
+  | L::tl -> L::tl
+  | R::tl -> L::(clear tl)
 
 let step (l:choice list) =
-  if done l then None else Some(rev (toggle (rev l)))
+  match rev (clear (toggle (rev l))) with
+  | [] -> None
+  | hd::tl -> Some(hd::tl)
 \end{lstlisting}
 
 
@@ -402,6 +408,8 @@ let rec initial(a:typ) =
    | Tuple(t1,t2) ->  (initial t1) @ (initial t2)
    | Union(l,r) ->  L::(initial l) @ (initial r)
 \end{lstlisting}
+
+
 
 \subsection{Subtyping}
 
@@ -536,7 +544,7 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
  match sub a b f e with 
   | IsSub(_,_) -> true 
   | NotSub -> 
-     (match step e with
+     (match next b e with
       | Some ns -> exists a b f ns 
       | None -> false) 
 \end{lstlisting}
@@ -544,7 +552,7 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
  \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
   match exists a b f (initial b) with 
-  | true -> (match step f with
+  | true -> (match next a f with
              | Some ns -> allexists a b ns 
              | None -> true) 
   | false -> false
