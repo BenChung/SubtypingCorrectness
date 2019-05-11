@@ -451,20 +451,37 @@ let rec pad = function
 
 To obtain the initial choice string, the string only composed of \Ls, it
 suffices to call \c{pad} with the type term under consideration and an empty
-list. The first element of the returned tuple is the initial choice string.
+list. The first element of the returned tuple is the initial choice string. For
+convienence, we will define the function \c{initial} for this purpose.
+
+\begin{lstlisting}
+let initial(t:typ) = fst (pad t [])
+\end{lstlisting}
 
 
 \subsection{Subtyping}
 
+stuff here. segue.
 
+The subtype function checks the forall-exists relationship between
+\c{a} and \c{b} by using \c{allexists} to check every left-hand choice,
+starting from the initial choice string.
 
 \begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (fst (pad a []))
+let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
+
+\c{allexists} recursively iterates through the possible choice string,
+checking that the forall-exists relationship exists. \c{allexists} will check
+that there exists some right-hand type that is a supertype of the one implied
+by \c{f} on \c{a}. If there is, then \c{allexists} recurses on the next
+iterator state if it exists or exit successfully if the iterator has finished.
+Otherwise, if there does not exist a supertype in \c{b}, then \c{allexists}
+will exit with a failure.
 
 \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (fst (pad b [])) with 
+  match exists a b f (initial b) with 
   | true -> (match next a f with
              | Some ns -> allexists a b ns 
              | None -> true) 
