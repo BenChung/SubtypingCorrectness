@@ -488,6 +488,11 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
   | false -> false
 \end{lstlisting}
 
+\c{exists} checks that there is a supertype on the right hand for some given left-hand type
+specified as a choice string. It does so by iterating over the right-hand type, using \c{sub}
+to check if the types induced by the two choice strings are subtypes. If they are, then \c{sub}
+will return \c{IsSub} (the arguments are used exclusively inside of \c{sub}), whereas if the subtyping
+relationship does not hold then it will return 
 
 \begin{lstlisting}
 type res  =  NotSub  |  IsSub of choice list * choice list
