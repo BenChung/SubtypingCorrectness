@@ -377,7 +377,8 @@ choice list. The initial choice list (all {\tt L}s) is obtained by function
 {\tt initial} given a type term.
 
 \begin{lstlisting}
-let rec next(l:choice list) = step l          
+let rec next(a:typ)(l:choice list) = 
+          option_map fst (option_map (pad a) (step l))
 \end{lstlisting}
 
 
@@ -387,26 +388,27 @@ type choice = L | R
 let rec toggle = function
   | [] -> []    
   | L::tl -> R::tl
-  | R::tl -> R::(toggle tl)
-
-let rec clear = function 
-  | [] -> []
-  | L::tl -> L::tl
-  | R::tl -> R::(clear tl)
+  | R::tl -> toggle tl
 
 let step (l:choice list) =
-  match rev (clear (toggle (rev l))) with
+  match List.rev (toggle (List.rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
 \end{lstlisting}
 
 
 \begin{lstlisting}
-let rec initial(a:typ) = 
-  match a with
-   | Prim _ -> []
-   | Tuple(t1,t2) ->  (initial t1) @ (initial t2)
-   | Union(l,r) ->  L::(initial l) @ (initial r)
+let rec pad(a:typ)(l:choice list) = 
+  match (a,ls) with
+   | (Prim i,_) -> ([],ls)
+   | (Tuple(t1,t2) _) -> 
+      let (hd,tl) = pad t1 ls in
+      let (hd2,tl2) = pad t2 tl in (hd @ hd2,tl2)
+   | (Union(l,r),L::rs) -> 
+      let (hd,tl) = pad l rs in (L::hd,tl)
+   | (Union(l,r),R::rs) -> 
+      let (hd,tl) = pad r rs in (R::hd,tl)
+   | (Union(l,r),[]) -> (L::initial l,[])
 \end{lstlisting}
 
 
