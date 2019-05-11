@@ -459,21 +459,22 @@ We use the iterator infrastructure to implement subtyping. Instead of iterating
 through lists of union-less types produced by normalization, we use two iterators
 and a choice-string-aware subtype decision procedure that checks subtyping in-place.
 
-The subtype function checks the forall-exists relationship between
-\c{a} and \c{b} by using \c{allexists} to check every left-hand choice,
-starting from the initial choice string.
+The \c{subtype} function checks the forall-exists relationship between two types
+by calling the \c{allexists} function, starting its iteration at the initial state
+for the left-hand-side. 
 
 \begin{lstlisting}
 let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
-\c{allexists} recursively iterates through the possible choice string,
-checking that the forall-exists relationship exists. \c{allexists} will check
-that there exists some right-hand type that is a supertype of the one implied
-by \c{f} on \c{a}. If there is, then \c{allexists} recurses on the next
-iterator state if it exists or exit successfully if the iterator has finished.
-Otherwise, if there does not exist a supertype in \c{b}, then \c{allexists}
-will exit with a failure.
+In order to ensure that the forall-exists relation holds starting from the
+given iterate, \c{allexists} needs to ensure that there exists some right-hand
+supertype for the current iterate and that this will hold for the successive
+states. It will check the former property using the \c{exists} function, which
+when started with the initial state for the right-hand-side will find if there
+is some supertype of the given left-hand-side type and choice string. Then, if this
+passes, \c{allexists} will continue iterating. If no more states  remain in
+the iterator, then \c{allexists} exits successfully.
 
 \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
@@ -484,13 +485,14 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
   | false -> false
 \end{lstlisting}
 
-\c{exists} checks that there is a supertype on the right hand for some given left-hand type
-specified as a choice string. It does so by iterating over the right-hand type, using \c{sub}
-to check if the types induced by the two choice strings are subtypes. If they are, then \c{sub}
-will return \c{IsSub} (the arguments are used exclusively inside of \c{sub}), whereas if the subtyping
-relationship does not hold then it will return \c{NotSub}. If the current types are subtypes, then \c{exists}
-exits successfully. If they are not, then \c{exists} will continue until it finds a right-hand type that is a 
-supertype or it runs out of types to examine. In this latter case, \c{exists} will then exit with a failure.
+Similarly, the \c{exists} function iterates through each option on the right-
+hand, checking if it is a supertype of the given left-hand type and choice
+string. It will first check if the current iterate is a supertype of the given
+left-hand type using the \c{sub} function. If \c{sub} returns \c{IsSub}, then
+the current right-hand choice string is a supertype of the given left-hand and
+\c{exists} can exit successfully. Otherwise,  \c{exists} will recur on the
+iterator until it either runs out of choice strings in the iterator (in which
+case it fails) or it finds a supertype of the left.
 
 \begin{lstlisting}
 type res  =  NotSub  |  IsSub of choice list * choice list
