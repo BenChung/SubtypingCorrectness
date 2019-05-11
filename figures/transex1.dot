@@ -4,10 +4,10 @@ digraph G {
   tuple [label="Tuple",color=lightblue,style=filled]
   union1 [label="Union", xlabel="L",color=lightblue,style=filled]
   union2 [label="Union", xlabel="R",color=lightblue,style=filled]
-  A [label="A",color=lightblue,style=filled]
-  B [label="B"]
-  C [label="C"]
-  D [label="D",color=lightblue,style=filled]
+  A [label=<p<SUB>2</SUB>>,color=lightblue,style=filled]
+  B [label=<p<SUB>1</SUB>>]
+  C [label=<p<SUB>3</SUB>>]
+  D [label=<p<SUB>2</SUB>>,color=lightblue,style=filled]
   tuple -> union1
   tuple -> union2
   union1 -> A
