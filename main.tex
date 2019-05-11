@@ -461,7 +461,9 @@ let initial(t:typ) = fst (pad t [])
 
 \subsection{Subtyping}
 
-stuff here. segue.
+We use the iterator infrastructure to implement subtyping. Instead of iterating
+through lists of union-less types produced by normalization, we use two iterators
+and a choice-string-aware subtype decision procedure that checks subtyping in-place.
 
 The subtype function checks the forall-exists relationship between
 \c{a} and \c{b} by using \c{allexists} to check every left-hand choice,
