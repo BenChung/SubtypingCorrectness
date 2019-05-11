@@ -332,22 +332,22 @@ we explain our mechanized proof.
 Given a type term such as the following,
 
 \medskip
-$\tuple{ \union{p_2}{p_1}, \union{p_3}{p_2}}$
+$\tuple{ \union{ \union{p_2}{p_3} }{p_1}, \union{p_3}{p_2}}$
 \medskip
 
 \noindent
 we are looking for an iteration sequence that will yield the following tuples
 
 \medskip
-$  \tuple{p_2,p_3}, ~ \tuple{p_2,p_2}, ~ \tuple{p_1,p_3}, ~ \tuple{p_1,p_2}$.
-\medskip
+\noindent $\tuple{p_2,p_3}, ~ \tuple{p_2,p_2}, ~ \tuple{p_1,p_3}, ~ \tuple{p_1,p_2}, ~
+  \tuple{p_3,p_3}, ~ \tuple{p_3,p_2}$.
 
 \noindent
 An alternative representation for the term is a tree, where each occurence
 of union node is a \emph{choice point}. The following tree has thus two
 choice points.
 
-\includegraphics[scale=.6]{figures/tree1.pdf}
+\includegraphics[scale=.25]{figures/tree1.pdf}
 
 \noindent
 At each choice point we can go either left or right, making such a decision
@@ -355,30 +355,61 @@ at each points leads to visit one particular tuple.
 
 \hspace{-4mm}{\small
 \begin{tabular}{@{}l@{~}ll@{~}ll@{~}ll@{~}l}
-\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree2.pdf} 
+\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree2.pdf} 
 \end{minipage} &  $ =   \tuple{p_2,p_3} $ &
-\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree3.pdf} 
+\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree3.pdf} 
 \end{minipage} &  $ =   \tuple{p_2,p_2} $ 
-&\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree4.pdf} 
-\end{minipage} &  $ =   \tuple{p_2,p_3} $ &
-\begin{minipage}{.8cm}\includegraphics[scale=.5]{figures/tree5.pdf} 
-\end{minipage} &  $ =   \tuple{p_2,p_2} $ 
+&\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree4.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_3} $ \\
+\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree5.pdf} 
+\end{minipage} &  $ =   \tuple{p_2,p_2} $  &
+\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree6.pdf} 
+\end{minipage} &  $ =   \tuple{p_3,p_2} $ 
+&\begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree7.pdf} 
+\end{minipage} &  $ =   \tuple{p_3,p_3} $ 
 \end{tabular}}
 
 \noindent 
 So, each tuple is uniquely determined from the original type term $t$ and a
-string of choices $c$. In the above example, iteration through the
-normalized, union-free, types is defined by the squence of strings {\tt LL},
-{\tt LR}, {\tt RL}, {\tt RR}. 
+choice string $c$. In the above example, iteration through the normalized,
+union-free, type terms is defined by the sequence of choice strings {\tt
+  LLL}, {\tt LLR}, {\tt LRL}, {\tt LRR}, {\tt RL}, {\tt RR}. The length of
+the strings of choices is bounded by the number of unions in a term.  The
+strings do not necessarily have the same length.
 
-We can iterate through the union-free tuple types that we would otherwise
-need to get from normalization by calling {\tt next} with a type term and a
+Stepping from a choice string $c$ to next is done as follows:  
+
+suppose $c = c' @ L @ c''$ and $c''$ is a possibly empty sequence of {\tt
+  R}s.
+
+then    $c_{next}$ is  $c' @ R @ c_{pad}$
+
+If there is no {\tt L} in $c$ we have finished iterating.
+
+
+
+identify the last occurrence of {\tt L} in $c$, (2) toggle it to {\tt R},
+(3) delete everything that follows and pad it with the proper number of {\tt
+  L}s.
+
+
+LLL   LLR
+
+
+LLR
+
+
+
+
+by calling {\tt next} with a type term and a
 choice list. The initial choice list (all {\tt L}s) is obtained by function
-{\tt initial} given a type term.
+{\tt pad} given a type term and an empty choice list.
 
 \begin{lstlisting}
 let rec next(a:typ)(l:choice list) = 
-          option_map fst (option_map (pad a) (step l))
+  match step l with
+   | None -> None
+   | Some(l') -> fst (pad a l')
 \end{lstlisting}
 
 
@@ -391,7 +422,7 @@ let rec toggle = function
   | R::tl -> toggle tl
 
 let step (l:choice list) =
-  match List.rev (toggle (List.rev l)) with
+  match rev (toggle (rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
 \end{lstlisting}
@@ -399,16 +430,16 @@ let step (l:choice list) =
 
 \begin{lstlisting}
 let rec pad(a:typ)(l:choice list) = 
-  match (a,ls) with
-   | (Prim i,_) -> ([],ls)
-   | (Tuple(t1,t2) _) -> 
-      let (hd,tl) = pad t1 ls in
-      let (hd2,tl2) = pad t2 tl in (hd @ hd2,tl2)
-   | (Union(l,r),L::rs) -> 
-      let (hd,tl) = pad l rs in (L::hd,tl)
-   | (Union(l,r),R::rs) -> 
-      let (hd,tl) = pad r rs in (R::hd,tl)
-   | (Union(l,r),[]) -> (L::initial l,[])
+  match (a,l) with
+   | (Prim i,_) -> ([],l)
+   | (Tuple(t,t'),_) -> 
+      let (h,tl) = pad t l in
+      let (h',tl') = pad t' tl in (h @ h',tl')
+   | (Union(t,_),L::r) -> 
+      let (h,tl) = pad t r in (L::h,tl)
+   | (Union(_,t),R::r) -> 
+      let (h,tl) = pad t r in (R::h,tl)
+   | (Union(t,_),[]) -> (L::(pad t []),[])
 \end{lstlisting}
 
 
@@ -553,7 +584,7 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
 
  \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (initial b) with 
+  match exists a b f (pad b []) with 
   | true -> (match next a f with
              | Some ns -> allexists a b ns 
              | None -> true) 
@@ -562,7 +593,7 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
 
 
 \begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (initial a)
+let subtype(a:typ)(b:typ) = allexists a b (pad a [])
 \end{lstlisting}
 
 Each of the functions \lstinline{exists} and \lstinline{allexists}
