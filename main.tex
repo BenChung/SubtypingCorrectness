@@ -428,25 +428,6 @@ we can iterate using the structural iterators to represent the base types
 being examined in each iteration. As long as the iterators are equivalent to
 the lists of base types produced by normalization, the execution is identical.
 
-
-
-Outline:
-
-subtyping with normalization precomputes the lists of base types. then it checks
-forall-exists between them. want to avoid precomputation
-
-it's equivalent to use our iterators. thus we can iterate using the exact same
-algortihm but without the memory overhead
-
-algorithm in ocaml consists of a base subtyping relation and two nested iterations
-over the left and right hand sides. the left hand iteration invokes the right hand
-iteration, searching for a right element that is a supertype of the left element.
-if all left elements have a right element which is a supertype, then subtyping holds.
-if there is some left element such that all right elements are not a supertype then 
-the types are not subtypes.
-
-Endout.
-
 Figure~\ref{fig:sstep} shows these two equivalent processes in detail,
 depicting the transition between the second to the third normal type. In
 the initial state, the tree form depicts us taking an L-choice at the first
