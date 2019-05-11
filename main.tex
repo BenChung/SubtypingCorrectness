@@ -507,17 +507,16 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
 
 
 \begin{lstlisting}
-let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
- match (a,b,f,e) with
- | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
- | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
-    (match sub ta1 tb1 f e with
-     | IsSub(f', e') -> sub ta2 tb2 f' e'
+let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list) = function
+ | (Prim i,Prim j,f,e) -> if i==j then IsSub(f,e) else NotSub
+ | (Tuple(a1,a2), Tuple(b1,b2),f,e) ->
+    (match sub a1 b1 f e with
+     | IsSub(f', e') -> sub a2 tb2 f' e'
      | NotSub -> NotSub)
- | (Union(a1,a2),b,d::f',e) -> 
-     sub (match d with L->a1 | R->a2) b f' e
- | (a,Union(b1,b2),f,d::e') -> 
-     sub a (match d with L->b1 | R->b2) f e'
+ | (Union(a,_),b,L::f,e) -> sub a b f e
+ | (Union(_,a),b,R::f,e) -> sub a b f e
+ | (a,Union(b,_),f,L::e) -> sub a b f e
+ | (a,Union(_,b),f,R::e) -> sub a b f e
 \end{lstlisting}
 
 
@@ -565,105 +564,6 @@ the list, \lstinline{step} will return \lstinline{None}, indicating that there
 are no more normal types to explore in the type being iterated.
 
 
-
-Through this mechanism, we have found two representations we can use as state
-for an iterator that examines every normal type in the normalized form without
-having to precompute them. It remains to use it to decide subtyping.
-
-\subsection{Subtyping}
-
-As discussed previously, we can decide subtyping by deciding if there is some
-value denoted by the right hand side for every value denoted by the left. In
-our type language, we accomplish this by finding one of the constituent base
-types  on the right for each base type---a type without any unions---on the
-left. The original subtyping algorithm  we proposed did this by normalizing
-both sides to lists of their base type constituents, then using a base
-subtyping relation to establish the  required relationship between said lists.
-We aim to replace the normalization to a list of base types with iterators
-that have the same meaning.
-
-We can do this in a very straightforward way. Since we have demonstrated the
-equivalence of iterating through possible choices within the type AST to
-iterating through the arrays of base types produced by normalization, we can
-use the exact same algorithm with only minor changes. As before, our algorithm
-needs to find a supertype on the right for every base type on the left.
-
-
-\begin{lstlisting}
-type res =
- | IsSub of choice list * choice list
- | NotSub
-\end{lstlisting}
-
-\begin{lstlisting}
-let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
- match (a,b,f,e) with
- | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
- | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
-    (match sub ta1 tb1 f e with
-     | IsSub(f', e') -> sub ta2 tb2 f' e'
-     | NotSub -> NotSub)
- | (Union(a1,a2),b,d::f',e) -> 
-       sub (match d with L ->a1 | R ->a2) b f' e
- | (a,Union(b1,b2),f,d::e') -> 
-       sub a (match d with L ->b1 | R ->b2) f e'
-\end{lstlisting}
-
-The first ``trick'' that we take advantage of is the fact that we never need
-to actually compute the base types we're subtyping. Instead, we can subtype
-the original AST in the context of the choice lists for each side. This is
-implemented in the above \lstinline{sub} function. It takes the full type ASTs
-being subtyped as well as the forall (\lstinline{f}) and exists
-(\lstinline{e}) choice lists, then computes subtying between the baes types 
-implied by the given choices in the given type AST. It does so by using the 
-given choice lists whenever it encounters a union, thereby eliminating all
-unions from the types under consideration.
-
-
-
-\begin{figure}[h]
-\center
-\begin{tabular}{cc|cc|c}
-\multicolumn{2}{c}{Stack} & \multicolumn{2}{c}{Type} & Base Query \\
-\hline
-$\forall$ & $\exists$ & $\forall$ & $\exists$ & \\
-\hline
-\goodcell L & \goodcell L & \goodcell \includegraphics[scale=0.3]{figures-gen/left1.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right1.pdf} 
-    & \goodcell ${A} <: {A}$ \\
-\hline
-\goodcell R & \badcell L & \badcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \badcell \includegraphics[scale=0.3]{figures-gen/right1.pdf}  
-    & \badcell ${B} \not<: {A}$ \\
-\goodcell R & \goodcell R & \goodcell \includegraphics[scale=0.3]{figures-gen/left2.pdf} & \goodcell \includegraphics[scale=0.3]{figures-gen/right2.pdf}  
-    & \goodcell ${B} <: {B}$ \\
-\hline
-\end{tabular}
-
-\hspace{1em}
-
-$\tuple{\union{A}{B}} <: \union{\tuple{A}}{\tuple{B}}$
-
-\caption{Subtyping decision procedure example; should I continue to exist?}\label{fig:cfs}
-\end{figure}
-
-Armed with this, all that remains to decide subtyping in a space-efficient
-manner is to compactly iterate over the choice lists. As described previously,
-we need to iterate over every base type on the left (forall) and find if there
-exists a supertype on the right (exists). We do this with two recursive
-functions:
-
-
-Each of the functions \lstinline{exists} and \lstinline{allexists}
-implements one ``side'' of the search. \lstinline{exists} is given a single
-left-hand choice list (and thus correspondant base type) and searches the
-right hand side's choice lists to see if there is a supertype of the given
-left-hand type. \lstinline{allexists} iterates through every type on the
-left using \lstinline{exists} to ensure that a supertype exists on the right
-hand side. Finally, \lstinline{subtype} simply calls \lstinline{allexists}
-with the initial iterator state.
-
-In this manner, we can decide subtyping between types with distributive unions and tuples
-without requiring ahead-of-time normalization. However, we have not yet shown that this
-algorithm is correct, which will be the topic of the following section.
 
 \subsection{Further optimizations}
 
