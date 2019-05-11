@@ -313,10 +313,10 @@ $\ell_2 = \{  \tuple{p_2,p_3}, \tuple{p_2,p_2}, \tuple{p_1,p_3},
           \tuple{p_1,p_2} \}$.
 \medskip
 
-\noindent determining whether $\ell_1 <: \ell_2$ boils down to following the
-above defined subtyping rules: for each element in $\ell_1$ {\sc
-  [allexist]}, there should be an element in $\ell_2$ {\sc [existL/R]} such
-that the tuples are subtypes {\sc [tuple]}.
+\noindent determining whether $\ell_1 <: \ell_2$ boils down to checking that
+for each element in $\ell_1$ there should be an element in $\ell_2$ such
+that the tuples are subtypes. Intuitively this mirrors the above defined
+rules ({\sc [allexist]}, {\sc [existL/R]}, {\sc [tuple]}).
 
 The intuition of Julia's subtyping algorithm is that it is possible to
 iterate over the original type terms and visit every one of the elements of
@@ -452,28 +452,21 @@ let initial(t:typ) = fst (pad t [])
 
 \subsection{Subtyping}
 
-We use the iterator infrastructure to implement subtyping. 
-The fundamental procedure is identical to the one with normalization: for each union free
-type term in the normal form for the left hand type, we need to ensure that there exists
-is a supertype union free type term on the right hand side. However, instead of precomputing
-said union free type terms, we generate them while checking subtyping from the combination of a type and the 
-choice string for that type.
-
-The entry point is through \c{subtype}. It establishes the forall-exists relationship using
-\c{allexists} starting from the left-hand initial state. 
+Subtyping visits union-free type terms using choice strings to iterate.  The
+\c{subtype} function takes two type terms, \c a and \c b, and returns true
+if they they are related by subtyping. It does this by iterating over all
+union-free type terms in \c a, and checking that for each of them, there
+exists a union-free type term in \c b that is a super-type.
 
 \begin{lstlisting}
 let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
-In order to ensure that the forall-exists relation between two types \c{a} and \c{b} holds starting from the
-given iterate \c{f}, \c{allexists} needs to ensure that there is some choice list for \c{b} that 
-supertype for the current iterate and that this will hold for the successive
-states. It will check the former property using the \c{exists} function, which
-when started with the initial state for the right-hand-side will find if there
-is some supertype of the given left-hand-side type and choice string. Then, if this
-passes, \c{allexists} will continue iterating. If no more states  remain in
-the iterator, then \c{allexists} exits successfully.
+The \c{allexists} function take two type terms, \c a and \c b, and a choice
+string \c f, and return true if \c a is a subtype of \c b for the position
+in the iteration sequence specified by \c f. This is achieved by recursively
+testing that for each union-free type term in \c a (induced by \c a and the
+current value of \c f), there exists a union-free supertype in \c b.
 
 \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
@@ -484,20 +477,15 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
   | false -> false
 \end{lstlisting}
 
-Similarly, the \c{exists} function iterates through each option on the right-
-hand, checking if it is a supertype of the given left-hand type and choice
-string. It will first check if the current iterate is a supertype of the given
-left-hand type using the \c{sub} function. If \c{sub} returns \c{IsSub}, then
-the current right-hand choice string is a supertype of the given left-hand and
-\c{exists} can exit successfully. Otherwise,  \c{exists} will recur on the
-iterator until it either runs out of choice strings in the iterator (in which
-case it fails) or it finds a supertype of the left.
+Similarly, the \c{exists} function takes two type terms, \c a and \c b, and
+two choice strings, \c f and \c e. It returns true if there exists in \c b a
+union-free supertype of the type specified by \c f in \c a. This is done by
+recursively iterating through \c e. The determination if two terms are
+related is delegated to \c{sub}.
 
 \begin{lstlisting}
-type res  =  NotSub  |  IsSub of choice list * choice list
-\end{lstlisting}
+type res = NotSub | IsSub of choice list * choice list
 
-\begin{lstlisting}
 let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
  match sub a b f e with 
   | IsSub(_,_) -> true 
@@ -507,13 +495,21 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
       | None -> false) 
 \end{lstlisting}
 
-Finally, the \c{sub} function decides if two types, defined by the base type term and 
-choice strings thereof, are subtypes. It directly decides subtyping between primitives
-and recurs on tuples. When given a union, it will take the branch dictated by the given
-choice string.
+Finally, the \c{sub} function take two type terms and two choice strings and
+return a value of type \c{res} which can be \c{NotSub} to indicate that the
+types are not subtypes or \c{IsSub(_,_)} when they are.  If the two types
+are primitives, then they are only subtypes if they are the same primitive
+types.  If the two types are tuples, they are subtpyes is both of their
+elements are subtypes. Not that the return type of \c{sub}, when successful,
+hold the unused choice strings for both type term arguments. When confronted
+with a union, \c{sub} will follow the choice string to decide which branch
+to take. Consider for instance the case when the first type term is
+\c{Union(t1,t2)} and the second is some type \c{t}, if the first element of
+the choice string is an \L, then \c{t1} and \c{t} will be checked, otherwise
+\c{sub} will check \c{t2} and \c{t}.
 
 \begin{lstlisting}
-let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list) = function
+let rec sub = function
  | (Prim i,Prim j,f,e) -> if i==j then IsSub(f,e) else NotSub
  | (Tuple(a1,a2), Tuple(b1,b2),f,e) ->
     (match sub a1 b1 f e with
@@ -527,47 +523,6 @@ let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list) = function
 
 
 
-
-
-
-
-As discussed previously, it's easy to decide subtyping if given the normalized
-form of both inputs. The algorithm loops through each of the base types on the
-left looking for a supertype among the right-hand base types. The problem that
-we described, however, was that in requiring the normalized form this
-algorithm needs exponential space. However, armed with the abovementioned
-iterator state, we can now use the same algorithm but without the space
-explosion.
-
-The idea is that instead of iterating through each list element by element
-we can iterate using the structural iterators to represent the base types
-being examined in each iteration. As long as the iterators are equivalent to
-the lists of base types produced by normalization, the execution is identical.
-
-Figure~\ref{fig:sstep} shows these two equivalent processes in detail,
-depicting the transition between the second to the third normal type. In
-the initial state, the tree form depicts us taking an L-choice at the first
-union and an R-choice at the second union; equivalently, the linear representation
-takes a L-choice than an R-choice. In the stepping operation, we notice that the
-final choice is an R-choice, so we cannot step it further; we continue back and
-identify that the first choice is an L-choice, so we turn it into an R-choice and
-remove all following choices. However, we have not made a choice at all unions
-anymore, as we no longer have a choice for the right union. To fix this, we make
-the L-choice at every union without a defined choice, equivalent to padding out
-the linearized representation with L-choices until it has a choice for every union.
-
-To fully define this stepping function, we depict an implementation in OCaml.
-It uses the linear representation of the choices made in a type AST, operating
-over \lstinline{choice list}s and \lstinline{typ}s. A new iterator state may
-be constructed by using the \lstinline{pad} function to pad out the empty
-choice list with L-choices, making a L-choice for every union in the type.
-Stepping then works in the same two phases as above; the \lstinline{next}
-function first calls \lstinline{step}, which finds the final L-choice in the
-list, turns it into an R-choice, and truncates all remaining choices. Then,
-\lstinline{next} calls \lstinline{pad} to fill out the rest of the list with
-L-choices to ensure that all unions have a choice. If no L-choices remain in
-the list, \lstinline{step} will return \lstinline{None}, indicating that there
-are no more normal types to explore in the type being iterated.
 
 
 
@@ -941,15 +896,18 @@ iterator-based algorithm, and is thus correct.
 
 The algorithm improves upon normalization in two key ways:
 \begin{itemize}
-  \item lazily exploring possible clauses, obviating the need to store a fully normalized type;
+  \item lazily exploring possible clauses, obviating the need to store a
+    fully normalized type;
   \item enabling fast paths that avoid the exploration of the full choice space.
 \end{itemize}
 
-In the worst case, our algorithm has the same big-O time complexity. However,
-lazily exploring the choice space allows us to require worst-case polynomial
-space, in comparison to normalization's exponential space complexity.
-Similarly, the algorithm enables optimizations that offer best (and typical)
-case time complexity improvements from exponential to linear time.
+\noindent
+In the worst case, our algorithm has the same big-O time complexity as
+normalization. However, lazily exploring the choice space allows us to
+require worst-case polynomial space, in comparison to normalization's
+exponential space complexity.  Similarly, the algorithm enables
+optimizations that offer best (and typical) case time complexity
+improvements from exponential to linear time.
 
 Worst case time complexity of both subtyping algorithms is determined by the
 number of clauses that would exist in the normalized type. In the worst case,
