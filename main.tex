@@ -452,20 +452,22 @@ let initial(t:typ) = fst (pad t [])
 
 \subsection{Subtyping}
 
-We use the iterator infrastructure to implement subtyping. Instead of iterating
-through lists of union-less types produced by normalization, we use two iterators
-and a choice-string-aware subtype decision procedure that checks subtyping in-place.
+We use the iterator infrastructure to implement subtyping. 
+The fundamental procedure is identical to the one with normalization: for each union free
+type term in the normal form for the left hand type, we need to ensure that there exists
+is a supertype union free type term on the right hand side. However, instead of precomputing
+said union free type terms, we generate them while checking subtyping from the combination of a type and the 
+choice string for that type.
 
-The \c{subtype} function checks the forall-exists relationship between two types
-by calling the \c{allexists} function, starting its iteration at the initial state
-for the left-hand-side. 
+The entry point is through \c{subtype}. It establishes the forall-exists relationship using
+\c{allexists} starting from the left-hand initial state. 
 
 \begin{lstlisting}
 let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
-In order to ensure that the forall-exists relation holds starting from the
-given iterate, \c{allexists} needs to ensure that there exists some right-hand
+In order to ensure that the forall-exists relation between two types \c{a} and \c{b} holds starting from the
+given iterate \c{f}, \c{allexists} needs to ensure that there is some choice list for \c{b} that 
 supertype for the current iterate and that this will hold for the successive
 states. It will check the former property using the \c{exists} function, which
 when started with the initial state for the right-hand-side will find if there
@@ -505,7 +507,7 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
       | None -> false) 
 \end{lstlisting}
 
-Finally, the \c{sub} function decides if two types, defined by the base type AST and 
+Finally, the \c{sub} function decides if two types, defined by the base type term and 
 choice strings thereof, are subtypes. It directly decides subtyping between primitives
 and recurs on tuples. When given a union, it will take the branch dictated by the given
 choice string.
