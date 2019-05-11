@@ -492,7 +492,9 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
 specified as a choice string. It does so by iterating over the right-hand type, using \c{sub}
 to check if the types induced by the two choice strings are subtypes. If they are, then \c{sub}
 will return \c{IsSub} (the arguments are used exclusively inside of \c{sub}), whereas if the subtyping
-relationship does not hold then it will return 
+relationship does not hold then it will return \c{NotSub}. If the current types are subtypes, then \c{exists}
+exits successfully. If they are not, then \c{exists} will continue until it finds a right-hand type that is a 
+supertype or it runs out of types to examine. In this latter case, \c{exists} will then exit with a failure.
 
 \begin{lstlisting}
 type res  =  NotSub  |  IsSub of choice list * choice list
@@ -508,15 +510,17 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
       | None -> false) 
 \end{lstlisting}
 
-
-
+Finally, the \c{sub} function decides if two types, defined by the base type AST and 
+choice strings thereof, are subtypes. It directly decides subtyping between primitives
+and recurs on tuples. When given a union, it will take the branch dictated by the given
+choice string.
 
 \begin{lstlisting}
 let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list) = function
  | (Prim i,Prim j,f,e) -> if i==j then IsSub(f,e) else NotSub
  | (Tuple(a1,a2), Tuple(b1,b2),f,e) ->
     (match sub a1 b1 f e with
-     | IsSub(f', e') -> sub a2 tb2 f' e'
+     | IsSub(f', e') -> sub a2 b2 f' e'
      | NotSub -> NotSub)
  | (Union(a,_),b,L::f,e) -> sub a b f e
  | (Union(_,a),b,R::f,e) -> sub a b f e
