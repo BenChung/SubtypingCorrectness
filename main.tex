@@ -1,11 +1,17 @@
 \documentclass[a4paper,english]{lipics-v2019}
-\usepackage{wrapfig,microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx,tabularx}
+\usepackage{wrapfig,microtype,amssymb,amsmath,stmaryrd,mathpartir,array,graphicx,tabularx,xspace}
 \usepackage[table]{xcolor}
 \newcommand{\xt}[1]{\texttt{#1}}
 %\newcommand{\tupleo}[1]{\xt{Tuple1\{}#1\xt{\}}}
 \newcommand{\tuplet}[2]{\xt{Tuple\{}#1,#2\xt{\}}}
 \newcommand{\union}[2]{\xt{Union\{}#1,#2\xt{\}}}
 \newcommand{\denotes}[1]{\llbracket #1 \rrbracket}
+
+\renewcommand{\L}{{\tt L}\xspace}
+\newcommand{\Ls}{{\tt L}s\xspace}
+\newcommand{\R}{{\tt R}\xspace}
+\newcommand{\uL}{{\underline{\tt L}}\xspace}
+\renewcommand{\c}[1]{\lstinline{#1}\xspace}
 
 %FZ
 \newcommand{\sub}{<:}
@@ -372,79 +378,136 @@ at each points leads to visit one particular tuple.
 \noindent 
 So, each tuple is uniquely determined from the original type term $t$ and a
 choice string $c$. In the above example, iteration through the normalized,
-union-free, type terms is defined by the sequence of choice strings {\tt
-  LLL}, {\tt LLR}, {\tt LRL}, {\tt LRR}, {\tt RL}, {\tt RR}. The length of
-the strings of choices is bounded by the number of unions in a term.  The
-strings do not necessarily have the same length.
-
-Stepping from a choice string $c$ to next is done as follows:  
-
-suppose $c = c' @ L @ c''$ and $c''$ is a possibly empty sequence of {\tt
-  R}s.
-
-then    $c_{next}$ is  $c' @ R @ c_{pad}$
-
-If there is no {\tt L} in $c$ we have finished iterating.
+union-free, type terms is defined by the sequence of choice strings \L\L\L,
+\L\L\R, \L\R\L, \L\R\R, \R\L, \R\R. The length of the strings of choices is
+bounded by the number of unions in a term.  The strings do not necessarily
+have the same length.
 
 
+The iteration sequence in the above example is thus \L\L\uL $\rightarrow$
+\L\uL\R $\rightarrow$ \L\R\uL $\rightarrow$ \uL\R\R $\rightarrow$ \R\uL
+$\rightarrow$ \R\R. Stepping from a choice string $c$ to next string
+consists of splitting the string such that $c = c' \,\L\,c''$ and $c''$ is a
+possibly empty sequence of \R.  The next string is $c'\, \R \, c_{pad}$,
+that is to say it retain the prefix $c'$, toggles the \L to an \R and is
+padded by a sequence of \L.  If there is no \L in $c$, iterations has
+terminated.
 
-identify the last occurrence of {\tt L} in $c$, (2) toggle it to {\tt R},
-(3) delete everything that follows and pad it with the proper number of {\tt
-  L}s.
-
-
-LLL   LLR
-
-
-LLR
-
-
-
-
-by calling {\tt next} with a type term and a
-choice list. The initial choice list (all {\tt L}s) is obtained by function
-{\tt pad} given a type term and an empty choice list.
+Iteration is performed by calling the \c{next} function with a type term and
+a choice string. \c{next} either returns the next string in the sequence or
+\c{None}. Internally, it calls on \c{step} to toggle the last \L and shorten
+the string (constructing $c'\,\R$). Then it call on \c{pad} to add the
+trailing sequence of \L (constructing $c'\,\R\,c_{pad}$).
 
 \begin{lstlisting}
+type choice = L | R
+
 let rec next(a:typ)(l:choice list) = 
   match step l with
    | None -> None
    | Some(l') -> fst (pad a l')
 \end{lstlisting}
 
+The \c{step} function delegates to \c{toggle} the job of flipping the last
+occurrence of \L. For ease of programming, it reverses the choice string so
+that \c{toggle} can be written as a simple recursion without an accumulator.
+If the given choice string has no \L, then \c{toggle} returns empty, and
+\c{step} returns \c{None}.
 
 \begin{lstlisting}
-type choice = L | R
+let step (l:choice list) =
+  match rev (toggle (rev l)) with
+  | [] -> None
+  | hd::tl -> Some(hd::tl)
 
 let rec toggle = function
   | [] -> []    
   | L::tl -> R::tl
   | R::tl -> toggle tl
-
-let step (l:choice list) =
-  match rev (toggle (rev l)) with
-  | [] -> None
-  | hd::tl -> Some(hd::tl)
 \end{lstlisting}
 
+The \c{pad} function take a type term and a choice string to be padded. It
+returns a pair, the first element is the padded string and the second is
+remaining string. \c{pad} traverses the term, visiting both side of each
+tuple, and for unions it uses the given choice string to direct its visit.
+Each union encountered consumes a character out of the input string, once
+the string is fully consumed, any remaining unions are treated as if there
+was a \L. The first component of the returned value is the choice given as
+argument extended with a number of \L corresponding to the number of unions
+encountered after string ran out.
 
 \begin{lstlisting}
-let rec pad(a:typ)(l:choice list) = 
-  match (a,l) with
-   | (Prim i,_) -> ([],l)
-   | (Tuple(t,t'),_) -> 
+let rec pad = function
+   | (Prim i,l) -> ([],l)
+   | (Tuple(t,t'),l) -> 
       let (h,tl) = pad t l in
       let (h',tl') = pad t' tl in (h @ h',tl')
    | (Union(t,_),L::r) -> 
       let (h,tl) = pad t r in (L::h,tl)
    | (Union(_,t),R::r) -> 
       let (h,tl) = pad t r in (R::h,tl)
-   | (Union(t,_),[]) -> (L::(pad t []),[])
+   | (Union(t,_),[]) -> (L::(fst(pad t [])),[])
+\end{lstlisting}
+
+To obtain the initial choice string, the string only composed of \Ls, it
+suffices to call \c{pad} with the type term under consideration and an empty
+list. The first element of the returned tuple is the initial choice string.
+
+
+\subsection{Subtyping}
+
+
+
+\begin{lstlisting}
+let subtype(a:typ)(b:typ) = allexists a b (fst (pad a []))
+\end{lstlisting}
+
+\begin{lstlisting}
+let rec allexists(a:typ)(b:typ)(f:choice list) =
+  match exists a b f (fst (pad b [])) with 
+  | true -> (match next a f with
+             | Some ns -> allexists a b ns 
+             | None -> true) 
+  | false -> false
+\end{lstlisting}
+
+
+\begin{lstlisting}
+type res  =  NotSub  |  IsSub of choice list * choice list
+\end{lstlisting}
+
+\begin{lstlisting}
+let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
+ match sub a b f e with 
+  | IsSub(_,_) -> true 
+  | NotSub -> 
+     (match next b e with
+      | Some ns -> exists a b f ns 
+      | None -> false) 
 \end{lstlisting}
 
 
 
-\subsection{Subtyping}
+
+\begin{lstlisting}
+let rec sub(a:typ)(b:typ)(f:choice list)(e:choice list)
+ match (a,b,f,e) with
+ | (Prim i,Prim j,_,_) -> if i==j then IsSub(f,e) else NotSub
+ | (Tuple(ta1,ta2), Tuple(tb1,tb2),_,_) ->
+    (match sub ta1 tb1 f e with
+     | IsSub(f', e') -> sub ta2 tb2 f' e'
+     | NotSub -> NotSub)
+ | (Union(a1,a2),b,d::f',e) -> 
+     sub (match d with L->a1 | R->a2) b f' e
+ | (a,Union(b1,b2),f,d::e') -> 
+     sub a (match d with L->b1 | R->b2) f e'
+\end{lstlisting}
+
+
+
+
+
+
 
 As discussed previously, it's easy to decide subtyping if given the normalized
 form of both inputs. The algorithm loops through each of the base types on the
@@ -571,30 +634,6 @@ we need to iterate over every base type on the left (forall) and find if there
 exists a supertype on the right (exists). We do this with two recursive
 functions:
 
-
-\begin{lstlisting}
-let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
- match sub a b f e with 
-  | IsSub(_,_) -> true 
-  | NotSub -> 
-     (match next b e with
-      | Some ns -> exists a b f ns 
-      | None -> false) 
-\end{lstlisting}
-
- \begin{lstlisting}
-let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (pad b []) with 
-  | true -> (match next a f with
-             | Some ns -> allexists a b ns 
-             | None -> true) 
-  | false -> false
-\end{lstlisting}
-
-
-\begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (pad a [])
-\end{lstlisting}
 
 Each of the functions \lstinline{exists} and \lstinline{allexists}
 implements one ``side'' of the search. \lstinline{exists} is given a single
