@@ -392,7 +392,7 @@ let rec toggle = function
 let rec clear = function 
   | [] -> []
   | L::tl -> L::tl
-  | R::tl -> L::(clear tl)
+  | R::tl -> R::(clear tl)
 
 let step (l:choice list) =
   match rev (clear (toggle (rev l))) with
