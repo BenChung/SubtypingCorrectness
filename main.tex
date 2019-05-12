@@ -538,30 +538,27 @@ required.
 
 \section{Correctness and completeness}
 
-Our proof strategy for our algorithms broadly follows the above presentation.
-We prove that iterators based on the intuition of making choices in the type
-tree can be used to decide subtyping, then use this framework to prove the
-choice string-based algorithm correct. We will focus on the core results,
-while full details of the proof can be found in our complete Coq
-mechanization.
+Our proof strategy broadly follows the above presentation.  We discuss the
+key results and relegate the details of the proof to our accompanying Coq
+mechanization. 
 
-In order to prove correctness of the subtyping algorithm, we must first establish
-a definition for correctness. Guided by semantic subtyping and the normalization based
-algorithm for subtyping, we define a denotational semantics for types that describes
-compound types as sets of types without unions.
+We start with a definition for correctness; guided by semantic subtyping and
+the normalization based algorithm, we define a denotational semantics for
+types that describes compound types as sets of types without unions.  The
+denotational semantics we use for types is as follows:
 
-The denotational semantics we use for types is as follows:
-
+\vspace{-3mm}
 \begin{align*}
 \denotes{p_i} &= \{p_i\} \\
 \denotes{\union{t_1}{t_2}} &= \denotes{t1} \cup \denotes{t2} \\
 \denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} | t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
 \end{align*}
+\vspace{-3mm}
 
-Using this denotational semantics for types-with-unions, we can define
-subtyping as if $\denotes{t_1} \subseteq \denotes{t_2}$, then $t_1 <: t_2$.
-Equivalently, we can state this as definition~\ref{dfn:scr}, which is canonicalized
-in our Coq proof as the \verb|NormalSubtype| relation.
+Using this denotational semantics, we define subtyping as if $\denotes{t_1}
+\subseteq \denotes{t_2}$, then $t_1 <: t_2$.  Equivalently,
+definition~\ref{dfn:scr} is canonicalized in our Coq proof as the
+\verb|NormalSubtype| relation.
 
 \begin{definition}[Subtyping Correctness]
 A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
@@ -569,22 +566,20 @@ A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \deno
 \label{dfn:scr}
 \end{definition}
 
+\noindent
 Proving a subtyping algorithm sound and complete is therefore equivalent to
-producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~NormalSubtype t1 t2}|; 
-that is, the function is able to decide whether two types are
-subtypes or not.
-
-Subtyping with normalization is trivially complete in this framework; the
-normalization procedure computes the full set of types denoted by each side
-and then directly checks set inclusion.
-
-However, what remains to be shown is that the iterator system is equivalent to
-normalization. We do so by first proving that tree-based iterators, iterators
-that assign choices to specific nodes within the type AST, iterate over the
-list of base types that normalization produces. We then prove the same
-property of list-based iterators by equivalence to tree-based iterators, and
-conclude by proving that the three methods all can be used to decide subtyping
-in a sound and complete manner.
+producing a function of type
+\verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|; that
+is, a function able to decide whether two types are subtypes or not.
+Subtyping with normalization is trivially complete; the normalization
+procedure computes the full set of types denoted by each side and then
+directly checks set inclusion.  However, what remains to be shown is that an
+iterator-based solution is equivalent to normalization. We do so by first
+proving that the iterator-based solution, visits the list of union-free
+types that normalization produces. We then prove the same property of
+list-based iterators by equivalence to tree-based iterators, and conclude by
+proving that the three methods all can be used to decide subtyping in a
+sound and complete manner.
 
 \subsection{Iterators}
 
@@ -663,11 +658,12 @@ For any type \verb|t| and proposition \verb|P|, and if:
 Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
 \begin{proof}
-We can compute the number of steps remaining in an iterator given its present state
-and the type over which it is iterating (see the \verb|iternum| function in Coq for
-details). As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
-As a concequence, we can use induction over the naturals on \verb|iternum| as the basis
-for our induction hypothesis for tree iterators.
+We can compute the number of steps remaining in an iterator given its
+present state and the type over which it is iterating (see the
+\verb|iternum| function in Coq for details). As \verb|next_tree| steps, the
+value of \verb|iternum| monotonically decreases.  As a concequence, we can
+use induction over the naturals on \verb|iternum| as the basis for our
+induction hypothesis for tree iterators.
 
 If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step. Therefore,
 \verb|pi| applies and the theorem holds.
