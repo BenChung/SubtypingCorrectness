@@ -557,17 +557,28 @@ denotational semantics we use for types is as follows:
 \vspace{-3mm}
 
 Using this denotational semantics, we define subtyping as if $\denotes{t_1}
-\subseteq \denotes{t_2}$, then $t_1 <: t_2$.  Equivalently,
-definition~\ref{dfn:scr} is canonicalized in our Coq proof as the
-\verb|NormalSubtype| relation.
+\subseteq \denotes{t_2}$, then $t_1 <: t_2$. Trivially, we can decide subtyping
+in this framework for unions and tuples, which we refer to as base subtyping and is
+written in Coq as the relation \verb|BaseSubtype|. Deciding subtyping with unions
+is the subject of the rest of this section.
+
+To make reasoning about this definition in Coq simpler, we rewrite it to explicitly
+include the forall and exists contexts that underlie the algorithms we will use:
 
 \begin{definition}[Subtyping Correctness]
-A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
+A subtyping relation $<:$ is consistent with distributive unions if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
 \exists t_2' \in \denotes{t_2}, t_1' <: t_2'$.
 \label{dfn:scr}
 \end{definition}
 
-\noindent
+We formalize this notion into the \verb|NormalSubtype| relation. We
+define \verb|InType t1 t2| as being equivalent to $t_1 \in \denotes{t_2}$. 
+Using this, we can then state definition~\ref{dfn:scr} in Coq as 
+\begin{verbatim}
+NormalSubtype t1 t2 := forall t'1, InType t'1 t1 -> 
+    exists t'2, InType t'2 t2 /\ BaseSubtype t'1 t'2.
+\end{verbatim}
+
 Proving a subtyping algorithm sound and complete is therefore equivalent to
 producing a function of type
 \verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|; that
@@ -754,10 +765,26 @@ implementation. It only remains to show that this step operation (called
 \verb|step_ctx| in Coq) is correct with respect to the iterator
 \verb|next_tree|.
 
-TODO: ns\_breakdown
 A key property relating stepping of explicit choice iterators and choice
-string iterators is one described in section 2: if the choice string $c$ 
-can be decomposed as $c=c'\,\L\,c''$ where $c''$ consists solely of \Rs.
+string iterators is one described in section 2: if the choice string $c$  can
+be decomposed as $c=c_h\,\L\,c_t$ where $c_t$ consists solely of \Rs. When we
+step it, we should end up with a new choice string $c'=c_h\,\R\,c_t'$ where
+$c_t'$ consists solely of \Ls. We formalize this as lemma~\ref{lem:snt}.
+
+\begin{lemma}[Structure of linearized {\tt next\_tree}]
+\label{lem:snt}
+\begin{small}\begin{verbatim}
+forall t it it' ls ls',
+    next_tree t it = Some it' -> itp t it = ls -> itp t it' = ls' ->
+    exists hd tl tl',
+      ls = hd ++ (L :: tl) /\
+      ls' = hd ++ (R :: tl') /\
+      (forall el, In el tl -> el = R) /\
+      (forall el, In el tl' -> el = L).
+\end{verbatim}\end{small}
+If a explicit assignment iterator \verb|it| can take a step to \verb|it'|, then
+the linearized 
+\end{lemma}
 
 \begin{lemma}[Correctness of step\_ctx]
 \begin{small}\begin{verbatim}
