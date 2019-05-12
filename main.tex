@@ -690,9 +690,12 @@ Definition exists_iter(a b : type) :
 
 \verb|exists_iter| is equivalent to the choice-stack based \verb|exists|,
 and determines if there exists some denotationally-contained type in \verb|b|
-that is a supertype of the given \verb|a|. Internally, it is implemented in 
-the same way as \verb|exists|, though using \verb|iter_rect| to iterate 
-through every iterator state.
+that is a supertype of the given \verb|a|. Internally, it is implemented by 
+using \verb|iter_rect| to perform induction over the list of remaining states in
+the iterator for \verb|b|. If no states remain, then trivially the failing case holds.
+Otherwise, it will determine if the current iterator state is a supertype of the given
+\verb|a|. If it is, then it can terminate early with a successful (left) outcome. Otherwise,
+it continues with the IH.
 
 \begin{small}\begin{verbatim}
 Definition forall_iter (a b : type) :
