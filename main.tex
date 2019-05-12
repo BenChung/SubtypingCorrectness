@@ -521,11 +521,6 @@ let rec sub = function
  | (a,Union(_,b),f,R::e) -> sub a b f e
 \end{lstlisting}
 
-
-
-
-
-
 \subsection{Further optimizations}
 
 We have presented our subtyping algorithm using lists of choices. In a
@@ -539,11 +534,16 @@ of the choice stacks themselves.
 \section{Correctness and completeness}
 
 Our proof strategy for our algorithms broadly follows the above presentation.
-We begin by defining subtyping using a denotational semantics, and show that
-normalization based subtyping is trivially correct in this framework. We then
-describe and characterize both tree-based and list-based iterators and use
-them to prove the same correctness theorem as the normalization based
-subtyping provides.
+We prove that iterators based on the intuition of making choices in the type
+tree can be used to decide subtyping, then use this framework to prove the
+choice string-based algorithm correct. We will focus on the core results,
+while full details of the proof can be found in our complete Coq
+mechanization.
+
+In order to prove correctness of the subtyping algorithm, we must first establish
+a definition for correctness. Guided by semantic subtyping and the normalization based
+algorithm for subtyping, we define a denotational semantics for types that describes
+compound types as sets of types without unions.
 
 The denotational semantics we use for types is as follows:
 
@@ -569,16 +569,17 @@ producing a function of type \verb|forall t1 t2:type, {NormalSubtype t1 t2} + {~
 that is, the function is able to decide whether two types are
 subtypes or not.
 
-Subtyping with normalization is trivially complete in this framework; the normalization
-procedure computes the full set of types denoted by each side and then directly checks
-set inclusion.
+Subtyping with normalization is trivially complete in this framework; the
+normalization procedure computes the full set of types denoted by each side
+and then directly checks set inclusion.
 
-However, what remains to be shown is that the iterator system is equivalent to normalization.
-We do so by first proving that tree-based iterators, iterators that assign choices to specific
-nodes within the type AST, iterate over the list of base types that normalization produces. We
-then prove the same property of list-based iterators by equivalence to tree-based iterators, and
-conclude by proving that the three methods all can be used to decide subtyping in a sound and complete
-manner.
+However, what remains to be shown is that the iterator system is equivalent to
+normalization. We do so by first proving that tree-based iterators, iterators
+that assign choices to specific nodes within the type AST, iterate over the
+list of base types that normalization produces. We then prove the same
+property of list-based iterators by equivalence to tree-based iterators, and
+conclude by proving that the three methods all can be used to decide subtyping
+in a sound and complete manner.
 
 \subsection{Iterators}
 
@@ -586,91 +587,15 @@ As described previously, we can use choices directly asigned to AST tree nodes
 as our iterator state. We do so in Coq using so-called structural iterators,
 which iterate over the structure of the type AST. By retaining the structure
 in the iterator, we make it explicit which component of the type is having a
-choice assigned to it. These iterators are defined as the following:s
+choice assigned to it. These iterators are defined as the following:
 
 \begin{small}\begin{verbatim}
-Inductive TypeIterator: type -> Set :=
-| TIPrim : forall i, TypeIterator (atom i)
-| TITuple : forall t1 t2, TypeIterator t1 -> TypeIterator t2 -> TypeIterator (tuple t1 t2)
-| TIUnionL : forall t1 t2, TypeIterator t1 -> TypeIterator (union t1 t2)
-| TIUnionR : forall t1 t2, TypeIterator t2 -> TypeIterator (union t1 t2).
+Inductive iter: type -> Set :=
+| IPrim : forall i, iter (atom i)
+| ITuple : forall t1 t2, iter t1 -> iter t2 -> iter (tuple t1 t2)
+| IUnionL : forall t1 t2, iter t1 -> iter (union t1 t2)
+| IUnionR : forall t1 t2, iter t2 -> iter (union t1 t2).
 \end{verbatim}\end{small}
-
-The \verb|TypeIterator| structure follows the structure of the type being
-iterated over. Choices at unions are represented as either an instance of
-\verb|TIUnionR| or \verb|TIUnionL|. This structure then lets us trivially
-define a function that extracts the current type at the iterator's position:
-
-\begin{small}\begin{verbatim}
-Fixpoint current (t:type)(ti:TypeIterator t):type :=
-match ti with
-| TIPrim i => atom i
-| TITuple ti1 ti2 p1 p2 => tuple (current ti1 p1) (current ti2 p2)
-| TIUnionL ti1 ti2 pl => (current ti1 pl)
-| TIUnionR ti1 ti2 pr => (current ti2 pr)
-end.
-\end{verbatim}
-\end{small}
-
-\noindent We can then define a function that produces the initial iterator state for a
-given type:
-
-\begin{small}
-\begin{verbatim}
-Fixpoint start_iterator (t:type):TypeIterator t :=
-  match t with
-  | (atom i) => TIPrim i
-  | (tuple t1 t2) => TITuple t1 t2 (start_iterator t1) (start_iterator t2)
-  | (union t1 t2) => TIUnionL t1 t2 (start_iterator t1)
-  end.
-\end{verbatim}
-\end{small}
-
-\noindent Next, we can define a step function that takes one state and either steps it
-to the next state or indicates that no such next state exists.
-
-\begin{small}\begin{verbatim}
-Fixpoint next(t:type)(ti:TypeIterator t) : option (TypeIterator t) :=
-  match ti with
-  | TIPrim i => None
-  | TITuple ti1 ti2 p1 p2 =>
-    match (next ti2 p2) with
-    | Some np2 => Some(TITuple ti1 ti2 p1 np2)
-    | None =>
-      match (next ti1 p1) with
-      | Some np1 => Some(TITuple ti1 ti2 np1 (start_iterator ti2))
-      | None => None
-      end
-    end
-  | TIUnionL ti1 ti2 pl =>
-    match (next ti1 pl) with
-    | Some npl => Some(TIUnionL ti1 ti2 npl)
-    | None => Some(TIUnionR ti1 ti2 (start_iterator ti2))
-    end
-  | TIUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next ti2 pr)
-  end.
-\end{verbatim}\end{small}
-
-With these definitions, we can then prove a basic form of correctness with
-respect to the denotational or normalization semantics:
-
-\begin{theorem}[Correctness of iterators]\begin{verbatim}
-Remaining t (start_iterator t) (clauses t)
-\end{verbatim}
-Every type in $\denotes{t}$ will be explored using \verb|next_step| from \verb|start_iterator t|. 
-\end{theorem}
-\begin{proof}
-The \verb|Remaining| predicate relates iterators to the list of types that remain to be iterated, so
-the Coq theorem statement indicates that the initial state of the iterator for type $t$ has every clause
-in the normalized version of $t$ remaining to be iterated.
-
-We proceed by induction on $t$. The cases for atomic types and unions follow
-from the IH trivially. We prove the theorem for tuples correct by case analyzing
-on the number of clauses induced by the first element in the tuple, then identifying
-the next element produced by the iterator from the tuple.
-
-See \verb|iterator_has_clauses| in the Coq proof for full details.
-\end{proof}
 
 \verb|next| returns \verb|Some s| if there is some successor state
 \verb|s| to the current, and \verb|None| if the given iterator state is
@@ -682,8 +607,8 @@ then define an induction principle for type iterators based on \verb|next|:
 \begin{small}\begin{verbatim}
 Definition iter_rect
   (t:type) (P:TypeIterator t -> Set)
-           (pi: forall it, next t it = None -> P it)
-           (ps : forall it' it'', P it'' -> next t it' = Some it'' -> P it')
+           (pi: forall it, tree_next t it = None -> P it)
+           (ps : forall it' it'', P it'' -> tree_next t it' = Some it'' -> P it')
            (it : TypeIterator t) : P it  
 \end{verbatim}\end{small}
 
@@ -691,7 +616,7 @@ For any type \verb|t| and proposition \verb|P|, and if:
 \begin{itemize} 
 	\item \verb|P| holds for an iterator that has no next state (e.g. is done)
 	\item if \verb|P| holds for the \emph{following} iterator state \verb|it|,
-	then \verb|P| holds for the \emph{preceeding} iterator state \verb|it'|.
+	then \verb|P| holds for the \emph{preceding} iterator state \verb|it'|.
 \end{itemize}
 Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
