@@ -251,20 +251,26 @@ part of any subtype algorithm based on ahead-of-time disjunctive
 normalisation. As a result, straightforward normalization, even to a relaxed
 normal form, is incompatible with the full Julia type system.
 
-In this paper we describe the key ideas used by the subtype algorithm
-implemented in the Julia language to deal with union types and covariant
-tuples. This strategy avoids both aforementioned problems, though we will
-focus  on the way that it solves the space explosion issue. To avoid being
-drawn in the vast complexity of Julia type algebra, we focus on a minimal
-language featuring union types, covariant tuples, and literals. This tiny
-language is expressive enough to highlight the decision strategy, and make
-this implementation technique known to a wider audience.  While Julia
-implementation shows that this technique extends, among others, to invariant
-constructors and existential types~\cite{DBLP:NardelliBPCBV18}, we expect that
-it can be leveraged in many other modern language designs. Additionally we
-prove in Coq that the algorithm is correct and complete with respect to a
-standard semantic subtyping model.
+The complete Julia subtype algorithm is implemented in close to two thousand
+lines of highly optimized C code. This paper addresses only one part of that
+algorithm, the technique used to avoid space explosion while dealing with
+union types and covariant tuples. This is done by defining an iteration
+strategy over type terms that keeps a string of bits as its state. The space
+requirement of the algorithm is bounded by the number of unions in the type
+terms being checked. We prove in Coq that the algorithm is correct and
+complete with respect to a standard semantic subtyping model.
 
+To avoid being drawn in the vast complexity of Julia type algebra, we focus
+on a minimal language featuring union, tuples, and primitive types. This
+tiny language is expressive enough to highlight the decision strategy, and
+make this implementation technique known to a wider audience.  The full
+Julia implementation shows that this technique extends, among others, to
+invariant constructors and existential types~\cite{DBLP:NardelliBPCBV18}, we
+expect that it can be leveraged in other modern language
+designs. 
+
+\medskip
+Our mechanized proof is available at: \url{github.com/stuff}.
 \newpage
 
 \section{A space-efficient subtyping algorithm}
@@ -316,13 +322,11 @@ $\ell_2 = \{  \tuple{p_2,p_3}, \tuple{p_2,p_2}, \tuple{p_1,p_3},
 \noindent determining whether $\ell_1 <: \ell_2$ boils down to checking that
 for each element in $\ell_1$ there should be an element in $\ell_2$ such
 that the tuples are subtypes. Intuitively this mirrors the above defined
-rules ({\sc [allexist]}, {\sc [existL/R]}, {\sc [tuple]}).
-
-The intuition of Julia's subtyping algorithm is that it is possible to
-iterate over the original type terms and visit every one of the elements of
-$\ell_1$ and $\ell_2$ without ever having to materialize those sets. The
-remainder of this section explains how this is done in Ocaml syntax before
-we explain our mechanized proof.
+rules ({\sc [allexist]}, {\sc [existL/R]}, {\sc [tuple]}). As for the
+algorithm, the intuition is that one can avoid normalization by iterating
+over the original type terms and visiting every one of the elements of
+$\ell_1$ and $\ell_2$ without having to materialize those sets. The
+remainder of this section explains how this is done.
 
 \subsection{Iteration}
 
@@ -338,6 +342,7 @@ we are looking for an iteration sequence that will yield the following tuples
 \medskip
 \noindent $\tuple{p_2,p_3}, ~ \tuple{p_2,p_2}, ~ \tuple{p_1,p_3}, ~ \tuple{p_1,p_2}, ~
   \tuple{p_3,p_3}, ~ \tuple{p_3,p_2}$.
+\medskip\vspace{-3mm}
 
 \noindent
 An alternative representation for the term is a tree, where each occurence
@@ -350,7 +355,7 @@ choice points.
 At each choice point we can go either left or right, making such a decision
 at each points leads to visit one particular tuple.
 
-\hspace{-4mm}{\small
+\hspace{-2mm}{\small
 \begin{tabular}{@{}l@{~}ll@{~}ll@{~}ll@{~}l}
 \begin{minipage}{1.2cm}\includegraphics[scale=.25]{figures/tree2.pdf} 
 \end{minipage} &  $ =   \tuple{p_2,p_3} $ &
@@ -366,29 +371,30 @@ at each points leads to visit one particular tuple.
 \end{minipage} &  $ =   \tuple{p_3,p_3} $ 
 \end{tabular}}
 
+\newpage
+
 \noindent 
-So, each tuple is uniquely determined from the original type term $t$ and a
-choice string $c$. In the above example, iteration through the normalized,
-union-free, type terms is defined by the sequence of choice strings \L\L\L,
-\L\L\R, \L\R\L, \L\R\R, \R\L, \R\R. The length of the strings of choices is
-bounded by the number of unions in a term.  The strings do not necessarily
-have the same length.
+Each tuple is uniquely determined by the original type term $t$ and a choice
+string $c$. In the above example, the result of iteration through the
+normalized, union-free, type terms is defined by the strings \L\L\L, \L\L\R,
+\L\R\L, \L\R\R, \R\L, \R\R. The length of each string is bounded by the
+number of unions in a term.
 
 
 The iteration sequence in the above example is thus \L\L\uL $\rightarrow$
 \L\uL\R $\rightarrow$ \L\R\uL $\rightarrow$ \uL\R\R $\rightarrow$ \R\uL
-$\rightarrow$ \R\R. Stepping from a choice string $c$ to next string
-consists of splitting the string such that $c = c' \,\L\,c''$ and $c''$ is a
-possibly empty sequence of \R.  The next string is $c'\, \R \, c_{pad}$,
-that is to say it retain the prefix $c'$, toggles the \L to an \R and is
-padded by a sequence of \L.  If there is no \L in $c$, iterations has
+$\rightarrow$ \R\R. Stepping from a choice string $c$ to the next string
+consists of splitting $c$ in three, $c' \,\L\,c''$, where $c'$ can be empty
+and $c''$ is a possibly empty sequence of \R.  The next string is $c'\, \R
+\, c_{pad}$, that is to say it retains the prefix $c'$, toggles \L to \R,
+and is padded by a sequence of \Ls.  If there is no \L in $c$, iterations has
 terminated.
 
-Iteration is performed by calling the \c{next} function with a type term and
-a choice string. \c{next} either returns the next string in the sequence or
-\c{None}. Internally, it calls on \c{step} to toggle the last \L and shorten
-the string (constructing $c'\,\R$). Then it call on \c{pad} to add the
-trailing sequence of \L (constructing $c'\,\R\,c_{pad}$).
+One step of iteration is performed by calling the \c{next} function with a
+type term and a choice string. \c{next} either returns the next string in
+the sequence or \c{None}. Internally, it calls on \c{step} to toggle the
+last \L and shorten the string (constructing $c'\,\R$). Then it call on
+\c{pad} to add the trailing sequence of \Ls (constructing $c'\,\R\,c_{pad}$).
 
 \begin{lstlisting}
 type choice = L | R
@@ -401,7 +407,7 @@ let rec next(a:typ)(l:choice list) =
 
 The \c{step} function delegates to \c{toggle} the job of flipping the last
 occurrence of \L. For ease of programming, it reverses the choice string so
-that \c{toggle} can be written as a simple recursion without an accumulator.
+that \c{toggle} can be written as simple recursion without an accumulator.
 If the given choice string has no \L, then \c{toggle} returns empty, and
 \c{step} returns \c{None}.
 
@@ -442,8 +448,8 @@ let rec pad = function
 
 To obtain the initial choice string, the string only composed of \Ls, it
 suffices to call \c{pad} with the type term under consideration and an empty
-list. The first element of the returned tuple is the initial choice string. For
-convienence, we will define the function \c{initial} for this purpose.
+list. The first element of the returned tuple is the initial choice
+string. For convenience, we define the function \c{initial} for this.
 
 \begin{lstlisting}
 let initial(t:typ) = fst (pad t [])
@@ -463,10 +469,10 @@ let subtype(a:typ)(b:typ) = allexists a b (initial a)
 \end{lstlisting}
 
 The \c{allexists} function take two type terms, \c a and \c b, and a choice
-string \c f, and return true if \c a is a subtype of \c b for the position
-in the iteration sequence specified by \c f. This is achieved by recursively
-testing that for each union-free type term in \c a (induced by \c a and the
-current value of \c f), there exists a union-free supertype in \c b.
+string \c f, and return true if \c a is a subtype of \c b for the iteration
+sequence starting at \c f. This is achieved by recursively testing that for
+each union-free type term in \c a (induced by \c a and the current value of
+\c f), there exists a union-free super-type in \c b.
 
 \begin{lstlisting}
 let rec allexists(a:typ)(b:typ)(f:choice list) =
@@ -478,10 +484,10 @@ let rec allexists(a:typ)(b:typ)(f:choice list) =
 \end{lstlisting}
 
 Similarly, the \c{exists} function takes two type terms, \c a and \c b, and
-two choice strings, \c f and \c e. It returns true if there exists in \c b a
-union-free supertype of the type specified by \c f in \c a. This is done by
+two choice strings, \c f and \c e. It returns true if there exists in \c b, a
+union-free super-type of the type specified by \c f in \c a. This is done by
 recursively iterating through \c e. The determination if two terms are
-related is delegated to \c{sub}.
+related is delegated to the \c{sub} function.
 
 \begin{lstlisting}
 type res = NotSub | IsSub of choice list * choice list
@@ -498,15 +504,15 @@ let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
 Finally, the \c{sub} function take two type terms and two choice strings and
 return a value of type \c{res} which can be \c{NotSub} to indicate that the
 types are not subtypes or \c{IsSub(_,_)} when they are.  If the two types
-are primitives, then they are only subtypes if they are the same primitive
-types.  If the two types are tuples, they are subtpyes is both of their
-elements are subtypes. Not that the return type of \c{sub}, when successful,
-hold the unused choice strings for both type term arguments. When confronted
-with a union, \c{sub} will follow the choice string to decide which branch
-to take. Consider for instance the case when the first type term is
-\c{Union(t1,t2)} and the second is some type \c{t}, if the first element of
-the choice string is an \L, then \c{t1} and \c{t} will be checked, otherwise
-\c{sub} will check \c{t2} and \c{t}.
+are primitives, then they are only subtypes if they are equal.  If the types
+are tuples, they are subtypes is both of their elements are subtypes. Note
+that the return type of \c{sub}, when successful, hold the unused choice
+strings for both type arguments. When confronted with a union, \c{sub} will
+follow the choice strings to decide which branch to take. Consider for
+instance the case when the first type term is \c{Union(t1,t2)} and the
+second is type \c{t}, if the first element of the choice string is an \L,
+then \c{t1} and \c{t} will be checked, otherwise \c{sub} will check \c{t2}
+and \c{t}.
 
 \begin{lstlisting}
 let rec sub = function
@@ -521,15 +527,14 @@ let rec sub = function
  | (a,Union(_,b),f,R::e) -> sub a b f e
 \end{lstlisting}
 
-\subsection{Further optimizations}
+\subsection{Further optimization}
 
-We have presented our subtyping algorithm using lists of choices. In a
-practical implementation, however, these lists of choices can be efficiently
-implemented (without allocation) by means of bit sets. This is the approach
-taken in the Julia implementation of this algorithm. With this optimization,
-the needed memory to decide a subtyping judgment is linear in the total number
-of unions in the given types; the algorithm needs no allocation beyond that
-of the choice stacks themselves.
+We have presented an implementation that used lists to represent choice
+strings. It thus required allocation when adding elements to the list and
+for reversing the list. In Julia, choice strings are represented by bit
+vectors of size bounded by the number of unions in each type term.  Once
+that size is known and the bit vector is created, no further allocation is
+required.
 
 \section{Correctness and completeness}
 
