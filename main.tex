@@ -597,19 +597,56 @@ Inductive iter: type -> Set :=
 | IUnionR : forall t1 t2, iter t2 -> iter (union t1 t2).
 \end{verbatim}\end{small}
 
-\verb|next| returns \verb|Some s| if there is some successor state
-\verb|s| to the current, and \verb|None| if the given iterator state is
-terminal. It will go left-to-right through unions, and will explore 2-tuples
-by iterating through the choices on the right for each choice on the left. We can
-then define an induction principle for type iterators based on \verb|next|:
+We can then define a stepping function for \verb|iter|s, which
+steps a choice assignment on the tree to the next. We step depth-first,
+left-to-right, so as to maintain the same order as we iterate through 
+choice strings.
+
+\begin{verbatim}
+Fixpoint next_tree (t:type)(ti:iter t) : option (iter t) :=
+  match ti with
+  | IPrim i => None
+  | ITuple2 ti1 ti2 p1 p2 =>
+    match (next_tree ti2 p2) with
+    | Some (np2) => Some(ITuple2 ti1 ti2 p1 np2)
+    | None =>
+      match (next_tree ti1 p1) with
+      | Some (np1) => Some(ITuple2 ti1 ti2 np1 (start_iterator ti2))
+      | None => None
+      end
+    end
+  | IUnionL ti1 ti2 pl =>
+    match (next_tree ti1 pl) with
+    | Some(npl) => Some(IUnionL ti1 ti2 npl)
+    | None => Some(IUnionR ti1 ti2 (start_iterator ti2))
+    end
+  | IUnionR ti1 ti2 pr => option_map (TIUnionR ti1 ti2) (next_tree ti2 pr)
+  end.
+\end{verbatim}
+
+We have four cases to worry about. If given a primitive type, there is no
+successor state. A tuple will first attempt to step its second child; if  that
+has no successor step, then it will step its first child and reset the second
+child (the truncate operation, but for trees). When given a union which goes
+left, it will check if the left branch has a state remaining and take it if
+possible. Otherwise, it will step to take the right branch on the union and
+re-initialize the iterator for the right branch. \verb|next_tree| returns
+\verb|Some s| if there is some successor state \verb|s| to the current, and
+\verb|None| if the given iterator state is terminal.
+
+TODO: figure.
+
+We can now define an induction principle over \verb|next_tree|. It is guaranteed
+to eventually reach a state from which it cannot step (as it forever moves right
+through the type tree). 
 
 \begin{theorem}
 \begin{small}\begin{verbatim}
 Definition iter_rect
-  (t:type) (P:TypeIterator t -> Set)
-           (pi: forall it, tree_next t it = None -> P it)
-           (ps : forall it' it'', P it'' -> tree_next t it' = Some it'' -> P it')
-           (it : TypeIterator t) : P it  
+  (t:type) (P:iter t -> Set)
+           (pi: forall it, next_tree t it = None -> P it)
+           (ps : forall it' it'', P it'' -> next_tree t it' = Some it'' -> P it')
+           (it : iter t) : P it  
 \end{verbatim}\end{small}
 
 For any type \verb|t| and proposition \verb|P|, and if:
@@ -621,25 +658,25 @@ For any type \verb|t| and proposition \verb|P|, and if:
 Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
 \begin{proof}
-Proving the induction principle for type iterators relies on the \verb|iternum|
-function, which decides the number of steps remaining in the iterator before termination.
-The proof proceeds by simultaneous case analysis on the number of remaining states and
-whether the iterator step function can produce a successor state from the present state.
+We can compute the number of steps remaining in an iterator given its present state
+and the type over which it is iterating (see the \verb|iternum| function in Coq for
+details). As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
+As a concequence, we can use induction over the naturals on \verb|iternum| as the basis
+for our induction hypothesis for tree iterators.
 
-If the iteration number is not yet 0, and if there is a successor state, then
-we simply  appeal to the induction hypothesis and continue on. If there is no
-successor state but  the iteration number is nonzero or vice versa, then by
-lemma (\verb|iternum_monotonic|, taking an iterator step decrements the
-iteration number) contradiction. Finally, if there is no next step and the iteration
-number is 0, then we have reached the base case and terminate.
+If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step. Therefore,
+\verb|pi| applies and the theorem holds.
+
+If \verb|iternum| is \verb|S n| for some \verb|n|, then \verb|next_tree| can take a step to a state for which
+\verb|iternum = n|. By the IH, we can assume that \verb|P| holds for states in which \verb|iternum = n|, 
+and therefore we can apply \verb|ps| and the theorem holds.
 
 For full details, see the Coq definition of \verb|iter_rect|.
-\end{proof}
+\end{proo
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
-to \verb|exists|, \verb|allexists|, and \verb|subtype| as described in the
-OCaml implementation.
-
+to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
+based on iteration over choice trees.
 \begin{small}\begin{verbatim}
 Definition exists_iter(a b : type) : 
   ({ t | InType t b /\ BaseSubtype a t } +
