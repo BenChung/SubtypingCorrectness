@@ -10,6 +10,7 @@
 \renewcommand{\L}{{\tt L}\xspace}
 \newcommand{\Ls}{{\tt L}s\xspace}
 \newcommand{\R}{{\tt R}\xspace}
+\newcommand{\Rs}{{\tt R}s\xspace}
 \newcommand{\uL}{{\underline{\tt L}}\xspace}
 \renewcommand{\c}[1]{\lstinline{#1}\xspace}
 
@@ -562,7 +563,7 @@ definition~\ref{dfn:scr} is canonicalized in our Coq proof as the
 
 \begin{definition}[Subtyping Correctness]
 A subtyping relation $<:$ is correct if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
-\exists t_2' \in \denotes{t_2}, t_1 <: t_2$.
+\exists t_2' \in \denotes{t_2}, t_1' <: t_2'$.
 \label{dfn:scr}
 \end{definition}
 
@@ -590,19 +591,20 @@ structure in the iterator, we make it explicit which component of the type is
 having a choice assigned to it.
 
 We define these explicit choice iterators dependently on the type that they
-iterate over. The possible states at primitives and tuples are simple, as in
-the former case there are no alternative choices to make and in the latter the
-choices are those for the children of the tuple. For unions, the iterator state 
-may go either left or right. In this manner, this structure explicitly assigns
-choices to specific unions in the type tree thereby linking the iterator state
-directly to the type.
+iterate over. The possible states \verb|IPrim| at primitives and \verb|ITuple|
+at tuples are simple, as in the former case there are no alternative choices
+to make and in the latter the choices are those for the children of the tuple.
+For unions, the iterator state  may go either left (\verb|IUnionL|) or right
+(\verb|IUnionR|). In this manner, this structure explicitly assigns choices to
+specific unions in the type tree thereby linking the iterator state directly
+to the type.
 
 \begin{small}\begin{verbatim}
-Inductive iter: type -> Set :=
-| IPrim : forall i, iter (prim i)
-| ITuple : forall t1 t2, iter t1 -> iter t2 -> iter (tuple t1 t2)
-| IUnionL : forall t1 t2, iter t1 -> iter (union t1 t2)
-| IUnionR : forall t1 t2, iter t2 -> iter (union t1 t2).
+Inductive iter: Typ -> Set :=
+| IPrim : forall i, iter (Prim i)
+| ITuple : forall t1 t2, iter t1 -> iter t2 -> iter (Tuple t1 t2)
+| IUnionL : forall t1 t2, iter t1 -> iter (Union t1 t2)
+| IUnionR : forall t1 t2, iter t2 -> iter (Union t1 t2).
 \end{verbatim}\end{small}
 
 We can then define a stepping function for \verb|iter|s, which
@@ -611,7 +613,7 @@ left-to-right, so as to maintain the same order as we iterate through
 choice strings.
 
 \begin{verbatim}
-Fixpoint next_tree (t:type)(ti:iter t) : option (iter t) :=
+Fixpoint next_tree (t:Typ)(ti:iter t) : option (iter t) :=
   match ti with
   | IPrim i => None
   | ITuple2 ti1 ti2 p1 p2 =>
@@ -651,7 +653,7 @@ through the type tree).
 \begin{theorem}
 \begin{small}\begin{verbatim}
 Definition iter_rect
-  (t:type) (P:iter t -> Set)
+  (t:Typ) (P:iter t -> Set)
            (pi: forall it, next_tree t it = None -> P it)
            (ps : forall it' it'', P it'' -> next_tree t it' = Some it'' -> P it')
            (it : iter t) : P it  
@@ -686,7 +688,7 @@ Using \verb|iter_rect|, we can implement and prove correct equivalent functions
 to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
 based on iteration over choice trees.
 \begin{small}\begin{verbatim}
-Definition exists_iter(a b : type) : 
+Definition exists_iter(a b : Typ) : 
   ({ t | InType t b /\ BaseSubtype a t } +
    {forall t, InType t b -> ~(BaseSubtype a t) }).
 \end{verbatim}\end{small}
@@ -701,7 +703,7 @@ Otherwise, it will determine if the current iterator state is a supertype of the
 it continues with the IH.
 
 \begin{small}\begin{verbatim}
-Definition forall_iter (a b : type) :
+Definition forall_iter (a b : Typ) :
   { forall t, In t (clauses a) -> exists t', InType t' b /\ (BaseSubtype t t')} +
   { exists t, In t (clauses a) /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
 \end{verbatim}\end{small}
@@ -716,7 +718,7 @@ that decides whether two types are subtypes or not. \verb|subtype| simply invoke
 \verb|forall_iter| to decide subtyping.
 
 \begin{small}\begin{verbatim}
-Definition subtype(a b:type) : {NormalSubtype a b} + {~NormalSubtype a b}.
+Definition subtype(a b:Typ) : {NormalSubtype a b} + {~NormalSubtype a b}.
 \end{verbatim}\end{small}
 
 \noindent The definition of \verb|subtype| works by calling \verb|forall_iter|, then
@@ -738,12 +740,12 @@ to a choice string. This function performs the inorder depth-first traversal of 
 type tree to convert its choices into a choice string. 
 
 \begin{small}\begin{verbatim}
-Fixpoint itp(t:type)(it:iter t):st_context :=
+Fixpoint itp(t:Typ)(it:iter t):st_context :=
    match it with
-   | TIPrim _ => nil
-   | TITuple t1 t2 it1 it2 => (itp t1 it1) ++ (itp t2 it2)
-   | TIUnionL t1 _ it1 => false :: (itp t1 it1)
-   | TIUnionR _ t2 it1 => true :: (itp t2 it1)
+   | IPrim _ => nil
+   | ITuple t1 t2 it1 it2 => (itp t1 it1) ++ (itp t2 it2)
+   | IUnionL t1 _ it1 => false :: (itp t1 it1)
+   | IUnionR _ t2 it1 => true :: (itp t2 it1)
    end.
 \end{verbatim}\end{small}
 
@@ -753,6 +755,9 @@ implementation. It only remains to show that this step operation (called
 \verb|next_tree|.
 
 TODO: ns\_breakdown
+A key property relating stepping of explicit choice iterators and choice
+string iterators is one described in section 2: if the choice string $c$ 
+can be decomposed as $c=c'\,\L\,c''$ where $c''$ consists solely of \Rs.
 
 \begin{lemma}[Correctness of step\_ctx]
 \begin{small}\begin{verbatim}
