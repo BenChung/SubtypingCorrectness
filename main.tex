@@ -581,17 +581,25 @@ list-based iterators by equivalence to tree-based iterators, and conclude by
 proving that the three methods all can be used to decide subtyping in a
 sound and complete manner.
 
-\subsection{Iterators}
+\subsection{Explicit-Choice Iterators}
 
-As described previously, we can use choices directly asigned to AST tree nodes
-as our iterator state. We do so in Coq using so-called structural iterators,
-which iterate over the structure of the type AST. By retaining the structure
-in the iterator, we make it explicit which component of the type is having a
-choice assigned to it. These iterators are defined as the following:
+As described previously, we can use choices directly asigned to type tree
+nodes as our iterator state. We do so in Coq using explicit choice iterators,
+which iterate over the structure of the type tree itself. By retaining the
+structure in the iterator, we make it explicit which component of the type is
+having a choice assigned to it.
+
+We define these explicit choice iterators dependently on the type that they
+iterate over. The possible states at primitives and tuples are simple, as in
+the former case there are no alternative choices to make and in the latter the
+choices are those for the children of the tuple. For unions, the iterator state 
+may go either left or right. In this manner, this structure explicitly assigns
+choices to specific unions in the type tree thereby linking the iterator state
+directly to the type.
 
 \begin{small}\begin{verbatim}
 Inductive iter: type -> Set :=
-| IPrim : forall i, iter (atom i)
+| IPrim : forall i, iter (prim i)
 | ITuple : forall t1 t2, iter t1 -> iter t2 -> iter (tuple t1 t2)
 | IUnionL : forall t1 t2, iter t1 -> iter (union t1 t2)
 | IUnionR : forall t1 t2, iter t2 -> iter (union t1 t2).
@@ -658,12 +666,11 @@ For any type \verb|t| and proposition \verb|P|, and if:
 Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
 \begin{proof}
-We can compute the number of steps remaining in an iterator given its
-present state and the type over which it is iterating (see the
-\verb|iternum| function in Coq for details). As \verb|next_tree| steps, the
-value of \verb|iternum| monotonically decreases.  As a concequence, we can
-use induction over the naturals on \verb|iternum| as the basis for our
-induction hypothesis for tree iterators.
+We can compute the number of steps remaining in an iterator given its present state
+and the type over which it is iterating (see the \verb|iternum| function in Coq for
+details). As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
+As a concequence, we can use induction over the naturals on \verb|iternum| as the basis
+for our induction hypothesis for explicit choice iterators.
 
 If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step. Therefore,
 \verb|pi| applies and the theorem holds.
@@ -684,7 +691,7 @@ Definition exists_iter(a b : type) :
    {forall t, InType t b -> ~(BaseSubtype a t) }).
 \end{verbatim}\end{small}
 
-\verb|exists_iter| is equivalent to the choice-stack based \verb|exists|,
+\verb|exists_iter| is equivalent to the choice string based \verb|exists|,
 and determines if there exists some denotationally-contained type in \verb|b|
 that is a supertype of the given \verb|a|. Internally, it is implemented by 
 using \verb|iter_rect| to perform induction over the list of remaining states in
@@ -710,99 +717,42 @@ that decides whether two types are subtypes or not. \verb|subtype| simply invoke
 
 \begin{small}\begin{verbatim}
 Definition subtype(a b:type) : {NormalSubtype a b} + {~NormalSubtype a b}.
-  destruct (forall_iter a b).
-  - left. [...]
-  - right. [...]
-Defined.
 \end{verbatim}\end{small}
 
-\noindent Therefore, using iterators, we can decide whether subtyping holds for any two types
-in our language. We will now show an equivalence between iterators and stacks-of-choices,
-allowing for more efficient implementation.
+\noindent The definition of \verb|subtype| works by calling \verb|forall_iter|, then
+conditioning its output to produce a result in terms of \verb|NormalSubtype|. 
 
-\subsection{Stacks}
+We can thus decide subtyping using choices at tree nodes as our iterator state.
+However, this does not yet prove correct the previous algorithm over choice strings.
 
-To show that the choice-stack based algorithm is correct, we reduce it to the
-already-shown-correct iterator-based algorithm for deciding subtyping. To do so,
-we show an equivalence between choice stacks and iterators, then prove correctness
-of the subtyping algorithms.
+\subsection{Choice Strings}
 
-In the context of the Coq proof, we use the type \verb|st_context| to refer
-to a choice stack. In Coq, this is represented as a list of boolean values,
-with false representing a left choice and true representing a right choice at
-a specific union.
+Our proof of correctness for the choice string based implementation relies 
+upon the choice tree representation. We first define a mechanism to linearize
+choice trees into choice strings, show that stepping the choice tree and linearizing
+is equivalent to linearizing and stepping the choice string, and then use these lemmas
+to prove correctness of the choice string based subtyping algorithm.
 
-To show equivalence between the iterator-based and stack-based algorithm, we need to
-first prove two properties:
-
-\begin{itemize}
-  \item iterators are convertible to equivalent choice lists;
-  \item stepping an iterator is equivalent to stepping a choice list.
-\end{itemize}
-
-We define an iterator and a choice stack to be equivalent if, when applied to
-the same type, they select the same subset of that type. To describe this, we
-define \verb|lookup_path| which looks up what type is selected by a given
-choice stack.
+The core of our proof is the simple function \verb|itp|, which converts an iterator
+to a choice string. This function performs the inorder depth-first traversal of the
+type tree to convert its choices into a choice string. 
 
 \begin{small}\begin{verbatim}
-Fixpoint lookup_path(t:type)(p:st_context) : type * st_context :=
-  match t, p with
-  | atom i, _ => (t, p)
-  | tuple t1 t2, _ =>
-    let (r1,p1) := lookup_path t1 p in
-    let (r2,p2) := lookup_path t2 p1 in
-    (tuple r1 r2, p2)
-  | union l r, false::rs => lookup_path l rs
-  | union l r, true::rs => lookup_path r rs
-  | _, nil => (t, nil)
-  end.
-\end{verbatim}\end{small}
-
-\verb|lookup_path| is notable in that it both returns the selected type as
-well as whatever of the choice stack remains once it reaches a leaf. This is
-needed in order to be able to traverse types that contain tuples,  whose left
-branches will potentially be given a longer choice stack then necessary.
-
-Next, we can convert iterators to paths in the straightforward manner, as
-implemented by \verb|iterator_to_path|:
-
-\begin{small}\begin{verbatim}
-Fixpoint iterator_to_path(t:type)(it:TypeIterator t):st_context :=
+Fixpoint itp(t:type)(it:iter t):st_context :=
    match it with
    | TIPrim _ => nil
-   | TITuple t1 t2 it1 it2 => (iterator_to_path t1 it1) ++ (iterator_to_path t2 it2)
-   | TIUnionL t1 _ it1 => false :: (iterator_to_path t1 it1)
-   | TIUnionR _ t2 it1 => true :: (iterator_to_path t2 it1)
+   | TITuple t1 t2 it1 it2 => (itp t1 it1) ++ (itp t2 it2)
+   | TIUnionL t1 _ it1 => false :: (itp t1 it1)
+   | TIUnionR _ t2 it1 => true :: (itp t2 it1)
    end.
 \end{verbatim}\end{small}
 
-\verb|iterator_to_path| simply traverses the iterator in order, appending onto the
-output choice stack whatever choice the iterator makes at that union. This illustrates
-the equivalence between iterators and choice stacks; choice stacks are simply iterators
-with the structural information removed.
-
-Using the combination of \verb|lookup_path| and \verb|iterator_to_path|, we
-can then show the first correctness property that we need to prove that the
-algorithm using choice stacks is correct:
-
-\begin{lemma}[Iterator to path is correct]
-\begin{small}\begin{verbatim}
-Lemma itp_correct : forall t it, 
-  current t it = fst (lookup_path t (iterator_to_path t it)).
-\end{verbatim}\end{small}
-
-For every type \verb|t| and type iterator \verb|it|, the iterator's current type \verb|current t it| is equal
-to the result of looking up the conversion of \verb|it| to a choice stack.
-\end{lemma}
-\begin{proof}
-See \verb|itp_correct| in the Coq proof.
-\end{proof}
-
-Stepping in the Coq implementation is implemented identically to the OCaml
+Stepping in the Coq implementation is implemented as described above
 implementation. It only remains to show that this step operation (called
 \verb|step_ctx| in Coq) is correct with respect to the iterator
-\verb|next|.
+\verb|next_tree|.
+
+TODO: ns\_breakdown
 
 \begin{lemma}[Correctness of step\_ctx]
 \begin{small}\begin{verbatim}
@@ -816,6 +766,7 @@ produce the same result as converting the result of stepping
 \verb|it|.
 \end{lemma}
 \begin{proof}
+
 See \verb|list_step_correct| in the Coq proof.
 \end{proof}
 
