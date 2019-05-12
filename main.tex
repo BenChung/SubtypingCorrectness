@@ -783,14 +783,35 @@ forall t it it' ls ls',
       (forall el, In el tl' -> el = L).
 \end{verbatim}\end{small}
 If a explicit assignment iterator \verb|it| can take a step to \verb|it'|, then
-the linearized 
+the linearized \verb|it| consists of some prefix and a \L-choice followed by a suffix of \Rs.
+The resulting \verb|it'| will then have the same prefix, a \R-choice, and a suffix of \Ls.
 \end{lemma}
+\begin{proof}
+The proof follows from induction over the initial iterator \verb|it|:
+\begin{itemize}
+    \item \verb|IPrim|: Since primitives cannot step, the theorem holds by default.
+    \item \verb|ITuple|: We first attempt to step the second child of the tuple; if it can step, then 
+    we reconstruct the desired output form from the IH. Otherwise, we attempt to step the first child and
+    do the same if it can. If neither can step, then the theorem holds by default.
+    \item \verb|IUnionL|: If the left child can step, then we will invoke the IH and continue. Otherwise,
+    the left child's linearization must consist of all-\Rs and the current \L choice is the one to be flipped. 
+    The remainder follows from padding.
+    \item \verb|IUnionR|: The right child must be able to step. If so, then the theorem holds by the IH.
+    If not then the theorem holds by default, as then \verb|it| is unable to step at all.
+\end{itemize}
+\end{proof}
+
+Lemma~\ref{lem:snt} establishes that as long as the explicit choice iterator can step, the linearized
+version will step in the way that we described in section 2. In the Coq version of this proof, we also
+prove that a terminal explicit choice iterator (e.g. one with no more transitions to take) has a linearized
+form of all \Rs. In conjunction, these theorems then let us prove equivalence between the explicit choice and
+choice string iterators.
+
 
 \begin{lemma}[Correctness of step\_ctx]
 \begin{small}\begin{verbatim}
 forall t it,
-    step_ctx t (iterator_to_path t it) =
-    (option_map (iterator_to_path t) (next t it)).
+    step_ctx t (itp t it) = (option_map (itp t) (next_tree t it)).
 \end{verbatim}\end{small}
 For every type \verb|t| and type iterator \verb|it|,
 stepping the choice-list equivalent of \verb|it| will
@@ -798,6 +819,15 @@ produce the same result as converting the result of stepping
 \verb|it|.
 \end{lemma}
 \begin{proof}
+If no next state exists from \verb|it|, then
+\verb|itp t it| must consist solely of \Rs. Therefore, \verb|step_ctx| will be \verb|None| as 
+will \verb|next_tree t it| and the theorem holds. 
+
+Otherwise, if there is some step tha can be taken from \verb|it|, then 
+the remainder follows from lemma~\ref{lem:snt}. We know that \verb|itp t it| can
+be broken down into a string of the form $c\,\L\,c'$ where $c'$ is solely \Rs, and thus
+the left hand side will be \verb|Some(|$c\,\R\,c''$\verb|)| where $c''$ is some amount of 
+padding \Ls. By lemma~\ref{lem:snt}, the right hand side can be decomposed identically, and the theorem holds.
 
 See \verb|list_step_correct| in the Coq proof.
 \end{proof}
