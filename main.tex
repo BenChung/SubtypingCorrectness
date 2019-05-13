@@ -574,68 +574,70 @@ A subtyping relation $<:$ is consistent with distributive unions if $t_1 <: t_2$
 \label{dfn:scr}
 \end{definition}
 
-Note that since $t_1'$ and $t_2'$ are union free, we can use
-\verb|BaseSubtype| to decide the inner subtype relation. This can be
-mechanized with the addition of a relation for denotational set inclusion,
-which we write as \verb|InType t1 t2|, equivalent to $t_1 \in \denotes{t_2}$.
-Using this, we can then state definition~\ref{dfn:scr} in Coq as
+With this definition in hand, we can now get on to proving that the subtyping
+algorithm is correct. We will begin by sanity checking our definition against
+normalization. Then we will introduce a new internal state for iterators over
+types without unions with explicit choice point assignment. Finally, we will use
+this new representation to show that the choice string algorithm is correct.
 
-\begin{verbatim}
-NormalSubtype t1 t2 := forall t'1, InType t'1 t1 -> 
-    exists t'2, InType t'2 t2 /\ BaseSubtype t'1 t'2.
-\end{verbatim}
+\subsection{Normalization}
 
-We then want to write a subtyping algorithm that is sound and complete with
-respect to this definition. To do so, we want a function that will, given
-input types \verb|t| and \verb|t'|, compute either a proof of
-\verb|NormalSubtype t t'| if the relation holds or a proof of
-\verb|~NormalSubtype t t'| if it does not. Therefore, the type signature of
-the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|.
+The normalization algorithm is the standard for subtyping with distributive 
+unions, and we therefore use it as a sanity check on our theorem. We begin by 
+defining a normalization function, describe the search strategy, and then sketch
+the proof of correctness. 
 
-To validate this definition, we have shown that normalization-based 
-subtyping satisfies its requirements. To do so, we define a normalization
-function \verb|clauses|, then use the decision procedure for \verb|BaseSubtype|
-\verb|base_subtype| to ensure that the required forall-exist relationship exists.
+Normalization follows a very similar path to the denotational semantics for
+types. As shown in the \lstinline{norm} pseudocode, normalizing a primitive
+produces itself, tuples will tuple the cross product of their children's
+normalized forms, and unions append the child normalized forms. 
 
-The implementation of the \verb|clauses| normalization function proceeds
-structurally over the type being normalized, producing a list of the
-normalized union-free types that the original type is composed of. Primitive
-types normalize to the singleton list of themselves. Tuples normalize to the
-cross product of their children. Unions are normalized by appending the union free
-types of both branches together. 
+\begin{lstlisting}
+let rec norm = function
+    | prim i -> [prim i]
+    | tuple t1 t2 -> map tuple (cross (norm t1) (norm t2))
+    | union t1 t2 -> app (norm t1) (norm t2)
+\end{lstlisting}
 
-\begin{small}\begin{verbatim}
-Fixpoint clauses(t:type): list type :=
-  match t with
-  | prim n => (prim n)::nil
-  | tuple2 t1 t2 => map (fun x => match x with (ti1, ti2) => tuple2 ti1 ti2 end)
-                        (list_prod (clauses t1) (clauses t2))
-  | union t1 t2 => (clauses t1) ++ (clauses t2)
-  end.
-\end{verbatim}\end{small}
+This leads us into our first lemma, relating \lstinline{norm} and type denotation.
 
-We can then prove that subtyping based on normalization satisfies our correctness
-theorem. We do so by using a helper function \verb|th_subtype| that identifies if
-a forall-exists relationship exists between two lists of union-free types, then invoking
-this helper with the results of \verb|clauses| to decide subtyping.
-\begin{small}\begin{verbatim}
-Fixpoint th_subtype(ts1 ts2: list type) : 
-    {forall t1, In t1 ts1 -> exists t2, In t2 ts2 /\ BaseSubtype t1 t2} +
-    {exists t1, In t1 ts1 /\ forall t2, In t2 ts2 -> ~BaseSubtype t1 t2}.
+\begin{lemma}[Equivalence of Normalization and Denotation]
+\label{lem:equiv_ndet}
+$t' \in \denotes{t}$ iff $t' \in$\,\lstinline{norm t}
+\end{lemma}
+\begin{proof}
+By structural induction on $t$.
+\end{proof}
 
-Definition normalize_subtype(t1 t2:type) : 
-    {NormalSubtype t1 t2} + { ~(NormalSubtype t1 t2)}.
-Proof.
-  destruct (th_subtype (clauses t1) (clauses t2)).
-  - left. [...]
-  - right. [...]
-Qed.
-\end{verbatim}\end{small}
+Since \lstinline{norm} is equivalent to finding the set denoted by a given
+type, it suffices to directly check the forall-exists relationship between the
+normalized left and right hand sides of the type. We can write a subtype function
+like the following:
 
-While this algorithm is straightforward, as mentioned previously it requires
-exponential space. Instead, we want to implement the algorithm described in section 2,
-which lazily computes the union-free types thereby avoiding the necessity of storing them.
-As in that section, we will use iterators to do so.
+\begin{lstlisting}
+let ex_list (a:typ) (b: list typ) =
+    fold_left (fun acc nt => acc || base_subtype a nt) false (norm b)
+let fa_ex_list (a:typ) (b:typ) =
+    fold_left (fun acc nt => acc && ex_list nt b) true (norm a)
+let norm_subtype (a:typ) (b:typ) = fa_ex_lst a b
+\end{lstlisting}
+
+\begin{theorem}[Correctness of normalization-based subtyping]
+For all {\tt a b}, \lstinline{norm_subtype a b = true} iff $a <: b$.
+\end{theorem}
+\begin{proof}
+Note that \lstlisting{ex_list a bl} is true iff there exists some 
+$t$ such that $a <: t$ and $t \in$\,\lstinline{bl}. Concequently,
+\lstlisting{fa_ex_list a b} is true iff forall $t \in$\,\lstlinline{norm a},
+ there exists a $t' \in$\,\lstinline{norm b} such that $t <: t'$. 
+By lemma~\ref{lem:equiv_ndet}, it follows that $\forall t \in \denotes{a},
+\exists t' \in \denotes{b}, t <: t'$.
+\end{proof}
+
+Therefore, normalization based subtyping is correct against our definition.
+It remains, however, to show that subtying based on iterators is correct.
+
+TODO: UNFINISHED TRANSITION
 
 We will begin with a treatment of iterators based on the structure of the
 types that they are iterating over. We call these \emph{tree} iterators, as
