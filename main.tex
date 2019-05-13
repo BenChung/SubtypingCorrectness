@@ -597,6 +597,13 @@ subtyping satisfies its requirements. To do so, we define a normalization
 function \verb|clauses|, then use the decision procedure for \verb|BaseSubtype|
 \verb|base_subtype| to ensure that the required forall-exist relationship exists.
 
+The implementation of the \verb|clauses| normalization function proceeds
+structurally over the type being normalized, producing a list of the
+normalized union-free types that the original type is composed of. Primitive
+types normalize to the singleton list of themselves. Tuples normalize to the
+cross product of their children. Unions are normalized by appending the union free
+types of both branches together. 
+
 \begin{small}\begin{verbatim}
 Fixpoint clauses(t:type): list type :=
   match t with
@@ -606,6 +613,50 @@ Fixpoint clauses(t:type): list type :=
   | union t1 t2 => (clauses t1) ++ (clauses t2)
   end.
 \end{verbatim}\end{small}
+
+We can then prove that subtyping based on normalization satisfies our correctness
+theorem. We do so by using a helper function \verb|th_subtype| that identifies if
+a forall-exists relationship exists between two lists of union-free types, then invoking
+this helper with the results of \verb|clauses| to decide subtyping.
+\begin{small}\begin{verbatim}
+Fixpoint th_subtype(ts1 ts2: list type) : 
+    {forall t1, In t1 ts1 -> exists t2, In t2 ts2 /\ BaseSubtype t1 t2} +
+    {exists t1, In t1 ts1 /\ forall t2, In t2 ts2 -> ~BaseSubtype t1 t2}.
+
+Definition normalize_subtype(t1 t2:type) : 
+    {NormalSubtype t1 t2} + { ~(NormalSubtype t1 t2)}.
+Proof.
+  destruct (th_subtype (clauses t1) (clauses t2)).
+  - left. [...]
+  - right. [...]
+Qed.
+\end{verbatim}\end{small}
+
+While this algorithm is straightforward, as mentioned previously it requires
+exponential space. Instead, we want to implement the algorithm described in section 2,
+which lazily computes the union-free types thereby avoiding the necessity of storing them.
+As in that section, we will use iterators to do so.
+
+We will begin with a treatment of iterators based on the structure of the
+types that they are iterating over. We call these \emph{tree} iterators, as
+their structure matches the trees implied by the types. They assign specific
+choices to choice points at union nodes within the type. By making explicit
+the relationship between choices made by the iterator and the type being
+iterated over, we avoid having to simultaneously argue about type structure and 
+iterator state.
+
+We then prove the algorithm correct using tree iterators to run over union-free
+types. To do so, we first prove an induction principle for tree iterators. We then
+use this induction principle to define decision procedures equivalent to \verb|exists|
+and \verb|allexists|, and then finally decide subtyping.
+
+Finally, we use a relation to type iterators to prove the choice string based
+algorithm correct. We first prove that stepping over type trees flattened into
+choice strings is equivalent to stepping the choice strings themselves. Then,
+we  leverage a translation from tree iterators to choice strings to use
+induction over the remaining states in the tree iterator to prove the choice
+list algorithm correct. Finally, we use the algorithm and its proofs of
+correctness to prove the existence of a choice list based subtyping procedure.
 
 \subsection{Explicit-Choice Iterators}
 
