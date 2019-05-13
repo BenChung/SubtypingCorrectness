@@ -650,15 +650,16 @@ types. To do so, we first prove an induction principle for tree iterators. We th
 use this induction principle to define decision procedures equivalent to \verb|exists|
 and \verb|allexists|, and then finally decide subtyping.
 
-Finally, we use a relation to type iterators to prove the choice string based
-algorithm correct. We first prove that stepping over type trees flattened into
-choice strings is equivalent to stepping the choice strings themselves. Then,
-we  leverage a translation from tree iterators to choice strings to use
-induction over the remaining states in the tree iterator to prove the choice
-list algorithm correct. Finally, we use the algorithm and its proofs of
-correctness to prove the existence of a choice list based subtyping procedure.
+Finally, we relate type iterators to choice strings and prove the choice
+string based algorithm correct. We first prove that stepping over type trees
+flattened into choice strings is equivalent to stepping the choice strings
+themselves. Then, we  leverage a translation from tree iterators to choice
+strings to use induction over the remaining states in the tree iterator to
+prove the choice list algorithm correct. Finally, we use the algorithm and its
+proofs of correctness to prove the existence of a choice list based subtyping
+procedure.
 
-\subsection{Explicit-Choice Iterators}
+\subsection{Tree Iterators}
 
 In the previous section, we used type trees annotated with left/right choices
 to illustrate the operation of the subtype algorithm. However, we can use this
@@ -668,14 +669,14 @@ choice string iterator state is that there is no unique mapping choice position 
 unions they are choosing the direction for, and therefore reasoning about the resultant
 structure is difficult.
 
-We avoid this problem in Coq using explicit choice iterators, which iterate
+We avoid this problem in Coq using tree iterators, which iterate
 over the structure of the type tree itself. By retaining the structure in the
 iterator, we make it explicit which component of the type is having a choice
 assigned to it. This allows us to prove key properties about iterators over
 union-free types using states that we will later show are equivalent to choice
 strings.
 
-We define these explicit choice iterators dependently on the type that they
+We define these tree iterators dependently on the type that they
 iterate over. The possible states \verb|IPrim| at primitives and \verb|ITuple|
 at tuples are simple, as in the former case there are no alternative choices
 to make and in the latter the choices are those for the children of the tuple.
@@ -701,12 +702,12 @@ choice strings.
 Fixpoint next_tree (t:Typ)(ti:iter t) : option (iter t) :=
   match ti with
   | IPrim i => None
-  | ITuple2 ti1 ti2 p1 p2 =>
+  | ITuple ti1 ti2 p1 p2 =>
     match (next_tree ti2 p2) with
-    | Some np2 => Some(ITuple2 ti1 ti2 p1 np2)
+    | Some np2 => Some(ITuple ti1 ti2 p1 np2)
     | None =>
       match (next_tree ti1 p1) with
-      | Some np1 => Some(ITuple2 ti1 ti2 np1 (start_iterator ti2))
+      | Some np1 => Some(ITuple ti1 ti2 np1 (start_iterator ti2))
       | None => None
       end
     end
@@ -749,7 +750,7 @@ Fixpoint total_num (t:type):nat :=
 Fixpoint iternum (t:type)(ti:iter t):nat :=
   match ti with
   | IAtom i => 0
-  | ITuple2 ti1 ti2 p1 p2 =>
+  | ITuple ti1 ti2 p1 p2 =>
     (iternum ti1 p1) * (total_num ti2) + (iternum ti2 p2)
   | IUnionL ti1 ti2 pl => (iternum ti1 pl) + (total_num ti2)
   | IUnionR ti1 ti2 pr => (iternum ti2 pr)
@@ -769,27 +770,24 @@ Definition iter_rect
            (it : iter t) : P it  
 \end{verbatim}\end{small}
 
-For any type \verb|t| and proposition \verb|P|, and if:
-\begin{itemize} 
-	\item \verb|P| holds for an iterator that has no next state (e.g. is done)
-	\item if \verb|P| holds for the \emph{following} iterator state \verb|it|,
-	then \verb|P| holds for the \emph{preceding} iterator state \verb|it'|.
-\end{itemize}
-Then \verb|P| holds for all iterators for type \verb|t|
-\end{theorem}
-\begin{proof}
-We can compute the number of steps remaining in an iterator given its present state
-and the type over which it is iterating. As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
-As a consequence, we can use induction over the naturals on \verb|iternum| as the basis
-for our induction hypothesis for explicit choice iterators.
+For any type \verb|t| and proposition \verb|P|, and if: \begin{itemize}
+\item \verb|P| holds for an iterator that has no next state (e.g. is done)
+\item if \verb|P| holds for the \emph{following} iterator state \verb|it|,
+then \verb|P| holds for the \emph{preceding} iterator state \verb|it'|.
+\end{itemize} Then \verb|P| holds for all iterators for type \verb|t|
+\end{theorem} \begin{proof} We can compute the number of steps remaining in an
+iterator given its present state and the type over which it is iterating. As
+\verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
+As a consequence, we can use induction over the naturals on \verb|iternum| as
+the basis for our induction hypothesis for tree iterators.
 
-If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step. Therefore,
-\verb|pi| applies and the theorem holds.
+If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a
+step. Therefore, \verb|pi| applies and the theorem holds.
 
-If \verb|iternum| is \verb|S n| for some \verb|n|, then \verb|next_tree| can take a step to a state for which
-\verb|iternum = n|. By the IH, we can assume that \verb|P| holds for states in which \verb|iternum = n|, 
-and therefore we can apply \verb|ps| and the theorem holds.
-\end{proof}
+If \verb|iternum| is \verb|S n| for some \verb|n|, then \verb|next_tree| can
+take a step to a state for which \verb|iternum = n|. By the IH, we can assume
+that \verb|P| holds for states in which \verb|iternum = n|,  and therefore we
+can apply \verb|ps| and the theorem holds. \end{proof}
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
 to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
@@ -860,7 +858,7 @@ Stepping in the Coq implementation is as described above. It only remains to
 show that this step operation (called \verb|step_ctx| in Coq) is correct with
 respect to the iterator \verb|next_tree|.
 
-A key property relating stepping of explicit choice iterators and choice
+A key property relating stepping of tree iterators and choice
 string iterators is one described in section 2: if the choice string $c$  can
 be decomposed as $c=c_h\,\L\,c_t$ where $c_t$ consists solely of \Rs. When we
 step it, we should end up with a new choice string $c'=c_h\,\R\,c_t'$ where
@@ -896,10 +894,10 @@ The proof follows from induction over the initial iterator \verb|it|:
 \end{itemize}
 \end{proof}
 
-Lemma~\ref{lem:snt} establishes that as long as the explicit choice iterator can step, the linearized
+Lemma~\ref{lem:snt} establishes that as long as the tree iterator can step, the linearized
 version will step in the way that we described in section 2. In the Coq version of this proof, we also
-prove that a terminal explicit choice iterator (e.g. one with no more transitions to take) has a linearized
-form of all \Rs. In conjunction, these theorems then let us prove equivalence between the explicit choice and
+prove that a terminal tree iterator (e.g. one with no more transitions to take) has a linearized
+form of all \Rs. In conjunction, these theorems then let us prove equivalence between the tree and
 choice string iterators.
 
 
@@ -944,7 +942,7 @@ of \verb|b| if and only if there is an integer \verb|n| such that
 \end{lemma}
 \begin{proof}
 
-The proof proceeds by induction on the explicit choice iterator \verb|it|. If
+The proof proceeds by induction on the tree iterator \verb|it|. If
 \verb|it| has no more steps, then \verb|exists_iter_inner| will be true
 (\verb|inleft|, in this encoding) iff the current \verb|it| induces a
 supertype of \verb|a|. Moreover, if \verb|it| cannot step, then neither can
