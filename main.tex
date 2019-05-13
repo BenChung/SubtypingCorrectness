@@ -592,16 +592,20 @@ input types \verb|t| and \verb|t'|, compute either a proof of
 \verb|~NormalSubtype t t'| if it does not. Therefore, the type signature of
 the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|.
 
-Subtyping with normalization is simple to prove correct; the normalization
-procedure computes the full set of types denoted by each side and then
-directly checks set inclusion. However, what remains to be shown is that an
-iterator-based solution is equivalent to normalization. We do so by first
-proving that by building iterators over choices made at explicitly specified
-nodes in the type tree, we can visit the same list of union-free types that
-normalization produces. We then prove the same property of list-based
-iterators by showing equivalence to tree-based iterators, and conclude by
-proving that the three methods all can be used to decide subtyping in a sound
-and complete manner.
+To validate this definition, we have shown that normalization-based 
+subtyping satisfies its requirements. To do so, we define a normalization
+function \verb|clauses|, then use the decision procedure for \verb|BaseSubtype|
+\verb|base_subtype| to ensure that the required forall-exist relationship exists.
+
+\begin{small}\begin{verbatim}
+Fixpoint clauses(t:type): list type :=
+  match t with
+  | prim n => (prim n)::nil
+  | tuple2 t1 t2 => map (fun x => match x with (ti1, ti2) => tuple2 ti1 ti2 end)
+                        (list_prod (clauses t1) (clauses t2))
+  | union t1 t2 => (clauses t1) ++ (clauses t2)
+  end.
+\end{verbatim}\end{small}
 
 \subsection{Explicit-Choice Iterators}
 
@@ -676,6 +680,31 @@ re-initialize the iterator for the right branch. \verb|next_tree| returns
 
 TODO: figure.
 
+We would like to do induction over the iterators themselves. In order to do
+a well-founded induction, we need to establish a metric to guarantee termination.
+We do so using the \verb|iternum| function, which numbers a given explicit assignment
+iterator state with the number of steps that remain until completion. In turn.
+\verb|iternum| relies on \verb|total_num|, which computes the total number of
+steps taken to iterate through an entire type from the beginning. 
+
+\begin{small}\begin{verbatim}
+Fixpoint total_num (t:type):nat :=
+  match t with
+  | prim i => 1
+  | tuple2 t1 t2 => (total_num t1) * (total_num t2)
+  | union t1 t2 => (total_num t1) + (total_num t2)
+  end.
+
+Fixpoint iternum (t:type)(ti:iter t):nat :=
+  match ti with
+  | IAtom i => 0
+  | ITuple2 ti1 ti2 p1 p2 =>
+    (iternum ti1 p1) * (total_num ti2) + (iternum ti2 p2)
+  | IUnionL ti1 ti2 pl => (iternum ti1 pl) + (total_num ti2)
+  | IUnionR ti1 ti2 pr => (iternum ti2 pr)
+  end.
+\end{verbatim}\end{small}
+
 We can now define an induction principle over \verb|next_tree|. It is guaranteed
 to eventually reach a state from which it cannot step (as it forever moves right
 through the type tree). 
@@ -699,9 +728,8 @@ Then \verb|P| holds for all iterators for type \verb|t|
 \end{theorem}
 \begin{proof}
 We can compute the number of steps remaining in an iterator given its present state
-and the type over which it is iterating (see the \verb|iternum| function in Coq for
-details). As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
-As a concequence, we can use induction over the naturals on \verb|iternum| as the basis
+and the type over which it is iterating. As \verb|next_tree| steps, the value of \verb|iternum| monotonically decreases.
+As a consequence, we can use induction over the naturals on \verb|iternum| as the basis
 for our induction hypothesis for explicit choice iterators.
 
 If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step. Therefore,
