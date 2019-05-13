@@ -574,6 +574,32 @@ A subtyping relation $<:$ is consistent with distributive unions if $t_1 <: t_2$
 \label{dfn:scr}
 \end{definition}
 
+TO trim:
+
+We will begin with a treatment of iterators based on the structure of the
+types that they are iterating over. We call these \emph{tree} iterators, as
+their structure matches the trees implied by the types. They assign specific
+choices to choice points at union nodes within the type. By making explicit
+the relationship between choices made by the iterator and the type being
+iterated over, we avoid having to simultaneously argue about type structure and 
+iterator state.
+
+We then prove the algorithm correct using tree iterators to run over union-free
+types. To do so, we first prove an induction principle for tree iterators. We then
+use this induction principle to define decision procedures equivalent to \verb|exists|
+and \verb|allexists|, and then finally decide subtyping.
+
+Finally, we relate type iterators to choice strings and prove the choice
+string based algorithm correct. We first prove that stepping over type trees
+flattened into choice strings is equivalent to stepping the choice strings
+themselves. Then, we  leverage a translation from tree iterators to choice
+strings to use induction over the remaining states in the tree iterator to
+prove the choice list algorithm correct. Finally, we use the algorithm and its
+proofs of correctness to prove the existence of a choice list based subtyping
+procedure.
+
+end trim
+
 With this definition in hand, we can now get on to proving that the subtyping
 algorithm is correct. We will begin by sanity checking our definition against
 normalization. Then we will introduce a new internal state for iterators over
@@ -626,9 +652,9 @@ let norm_subtype (a:typ) (b:typ) = fa_ex_lst a b
 For all {\tt a b}, \lstinline{norm_subtype a b = true} iff $a <: b$.
 \end{theorem}
 \begin{proof}
-Note that \lstlisting{ex_list a bl} is true iff there exists some 
+Note that \lstinline{ex_list a bl} is true iff there exists some 
 $t$ such that $a <: t$ and $t \in$\,\lstinline{bl}. Concequently,
-\lstlisting{fa_ex_list a b} is true iff forall $t \in$\,\lstlinline{norm a},
+\lstinline{fa_ex_list a b} is true iff forall $t \in$\,\lstinline{norm a},
  there exists a $t' \in$\,\lstinline{norm b} such that $t <: t'$. 
 By lemma~\ref{lem:equiv_ndet}, it follows that $\forall t \in \denotes{a},
 \exists t' \in \denotes{b}, t <: t'$.
@@ -636,30 +662,6 @@ By lemma~\ref{lem:equiv_ndet}, it follows that $\forall t \in \denotes{a},
 
 Therefore, normalization based subtyping is correct against our definition.
 It remains, however, to show that subtying based on iterators is correct.
-
-TODO: UNFINISHED TRANSITION
-
-We will begin with a treatment of iterators based on the structure of the
-types that they are iterating over. We call these \emph{tree} iterators, as
-their structure matches the trees implied by the types. They assign specific
-choices to choice points at union nodes within the type. By making explicit
-the relationship between choices made by the iterator and the type being
-iterated over, we avoid having to simultaneously argue about type structure and 
-iterator state.
-
-We then prove the algorithm correct using tree iterators to run over union-free
-types. To do so, we first prove an induction principle for tree iterators. We then
-use this induction principle to define decision procedures equivalent to \verb|exists|
-and \verb|allexists|, and then finally decide subtyping.
-
-Finally, we relate type iterators to choice strings and prove the choice
-string based algorithm correct. We first prove that stepping over type trees
-flattened into choice strings is equivalent to stepping the choice strings
-themselves. Then, we  leverage a translation from tree iterators to choice
-strings to use induction over the remaining states in the tree iterator to
-prove the choice list algorithm correct. Finally, we use the algorithm and its
-proofs of correctness to prove the existence of a choice list based subtyping
-procedure.
 
 \subsection{Tree Iterators}
 
