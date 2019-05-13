@@ -552,18 +552,21 @@ denotational semantics we use for types is as follows:
 \begin{align*}
 \denotes{p_i} &= \{p_i\} \\
 \denotes{\union{t_1}{t_2}} &= \denotes{t1} \cup \denotes{t2} \\
-\denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} | t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
+\denotes{\tuplet{t_1}{t_2}} &= \{\tuplet{t'_1}{t'_2} \,|\, t_1' \in \denotes{t_1},  t_2' \in \denotes{t_2'}\} \\
 \end{align*}
 \vspace{-3mm}
 
 Using this denotational semantics, we define subtyping as if $\denotes{t_1}
-\subseteq \denotes{t_2}$, then $t_1 <: t_2$. Trivially, we can decide subtyping
-in this framework for unions and tuples, which we refer to as base subtyping and is
-written in Coq as the relation \verb|BaseSubtype|. Deciding subtyping with unions
-is the subject of the rest of this section.
+\subseteq \denotes{t_2}$, then $t_1 <: t_2$. It is easy to decide subtyping
+for types that consist only of tuples and unions by testing for equality. We
+define this operation in Coq as the relation \verb|BaseSubtype a b|,
+indicating that the union-free types \verb|a| is a subtype of \verb|b|.
+Deciding subtyping with unions is the subject of the rest of this section.
 
-To make reasoning about this definition in Coq simpler, we rewrite it to explicitly
-include the forall and exists contexts that underlie the algorithms we will use:
+To make reasoning about this definition in Coq simpler and to link the
+definition to the earlier forall-exists formulation of subtyping, we rewrite
+it to explicitly include the forall and exists contexts that underlie the
+algorithms we will use. This leads to definition~\ref{dfn:scr}.
 
 \begin{definition}[Subtyping Correctness]
 A subtyping relation $<:$ is consistent with distributive unions if $t_1 <: t_2$ iff $\forall t_1' \in \denotes{t_1},
@@ -571,35 +574,53 @@ A subtyping relation $<:$ is consistent with distributive unions if $t_1 <: t_2$
 \label{dfn:scr}
 \end{definition}
 
-We formalize this notion into the \verb|NormalSubtype| relation. We
-define \verb|InType t1 t2| as being equivalent to $t_1 \in \denotes{t_2}$. 
-Using this, we can then state definition~\ref{dfn:scr} in Coq as 
+Note that since $t_1'$ and $t_2'$ are union free, we can use
+\verb|BaseSubtype| to decide the inner subtype relation. This can be
+mechanized with the addition of a relation for denotational set inclusion,
+which we write as \verb|InType t1 t2|, equivalent to $t_1 \in \denotes{t_2}$.
+Using this, we can then state definition~\ref{dfn:scr} in Coq as
+
 \begin{verbatim}
 NormalSubtype t1 t2 := forall t'1, InType t'1 t1 -> 
     exists t'2, InType t'2 t2 /\ BaseSubtype t'1 t'2.
 \end{verbatim}
 
-Proving a subtyping algorithm sound and complete is therefore equivalent to
-producing a function of type
-\verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|; that
-is, a function able to decide whether two types are subtypes or not.
-Subtyping with normalization is trivially complete; the normalization
+We then want to write a subtyping algorithm that is sound and complete with
+respect to this definition. To do so, we want a function that will, given
+input types \verb|t| and \verb|t'|, compute either a proof of
+\verb|NormalSubtype t t'| if the relation holds or a proof of
+\verb|~NormalSubtype t t'| if it does not. Therefore, the type signature of
+the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} +
+{~NormalSubtype t t'}|.
+
+Subtyping with normalization is simple to prove correct (see
+\verb|normalize_subtype| in the Coq source for full detail); the normalization
 procedure computes the full set of types denoted by each side and then
-directly checks set inclusion.  However, what remains to be shown is that an
+directly checks set inclusion. However, what remains to be shown is that an
 iterator-based solution is equivalent to normalization. We do so by first
-proving that the iterator-based solution, visits the list of union-free
-types that normalization produces. We then prove the same property of
-list-based iterators by equivalence to tree-based iterators, and conclude by
-proving that the three methods all can be used to decide subtyping in a
-sound and complete manner.
+proving that by building iterators over choices made at explicitly specified
+nodes in the type tree, we can visit the same list of union-free types that
+normalization produces. We then prove the same property of list-based
+iterators by showing equivalence to tree-based iterators, and conclude by
+proving that the three methods all can be used to decide subtyping in a sound
+and complete manner.
 
 \subsection{Explicit-Choice Iterators}
 
-As described previously, we can use choices directly asigned to type tree
-nodes as our iterator state. We do so in Coq using explicit choice iterators,
-which iterate over the structure of the type tree itself. By retaining the
-structure in the iterator, we make it explicit which component of the type is
-having a choice assigned to it.
+In the previous section, we used type trees annotated with left/right choices
+to illustrate the operation of the subtype algorithm. However, we can use this
+same representation as the state of iterators over choices with a fully explicit mapping
+to the structure of the type being iterated over. The problem with the original 
+choice string iterator state is that there is no unique mapping choice position to the
+unions they are choosing the direction for, and therefore reasoning about the resultant
+structure is difficult.
+
+We avoid this problem in Coq using explicit choice iterators, which iterate
+over the structure of the type tree itself. By retaining the structure in the
+iterator, we make it explicit which component of the type is having a choice
+assigned to it. This allows us to prove key properties about iterators over
+union-free types using states that we will later show are equivalent to choice
+strings.
 
 We define these explicit choice iterators dependently on the type that they
 iterate over. The possible states \verb|IPrim| at primitives and \verb|ITuple|
