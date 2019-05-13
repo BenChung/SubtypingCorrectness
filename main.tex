@@ -590,8 +590,7 @@ respect to this definition. To do so, we want a function that will, given
 input types \verb|t| and \verb|t'|, compute either a proof of
 \verb|NormalSubtype t t'| if the relation holds or a proof of
 \verb|~NormalSubtype t t'| if it does not. Therefore, the type signature of
-the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} +
-{~NormalSubtype t t'}|.
+the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|.
 
 Subtyping with normalization is simple to prove correct (see
 \verb|normalize_subtype| in the Coq source for full detail); the normalization
@@ -650,10 +649,10 @@ Fixpoint next_tree (t:Typ)(ti:iter t) : option (iter t) :=
   | IPrim i => None
   | ITuple2 ti1 ti2 p1 p2 =>
     match (next_tree ti2 p2) with
-    | Some (np2) => Some(ITuple2 ti1 ti2 p1 np2)
+    | Some np2 => Some(ITuple2 ti1 ti2 p1 np2)
     | None =>
       match (next_tree ti1 p1) with
-      | Some (np1) => Some(ITuple2 ti1 ti2 np1 (start_iterator ti2))
+      | Some np1 => Some(ITuple2 ti1 ti2 np1 (start_iterator ti2))
       | None => None
       end
     end
