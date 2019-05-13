@@ -592,8 +592,7 @@ input types \verb|t| and \verb|t'|, compute either a proof of
 \verb|~NormalSubtype t t'| if it does not. Therefore, the type signature of
 the desired subtype function is \verb|forall t t':type, {NormalSubtype t t'} + {~NormalSubtype t t'}|.
 
-Subtyping with normalization is simple to prove correct (see
-\verb|normalize_subtype| in the Coq source for full detail); the normalization
+Subtyping with normalization is simple to prove correct; the normalization
 procedure computes the full set of types denoted by each side and then
 directly checks set inclusion. However, what remains to be shown is that an
 iterator-based solution is equivalent to normalization. We do so by first
@@ -711,8 +710,6 @@ If \verb|iternum| is 0, then it follows that \verb|next_tree| cannot take a step
 If \verb|iternum| is \verb|S n| for some \verb|n|, then \verb|next_tree| can take a step to a state for which
 \verb|iternum = n|. By the IH, we can assume that \verb|P| holds for states in which \verb|iternum = n|, 
 and therefore we can apply \verb|ps| and the theorem holds.
-
-For full details, see the Coq definition of \verb|iter_rect|.
 \end{proof}
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
@@ -780,10 +777,9 @@ Fixpoint itp(t:Typ)(it:iter t):st_context :=
    end.
 \end{verbatim}\end{small}
 
-Stepping in the Coq implementation is implemented as described above
-implementation. It only remains to show that this step operation (called
-\verb|step_ctx| in Coq) is correct with respect to the iterator
-\verb|next_tree|.
+Stepping in the Coq implementation is as described above. It only remains to
+show that this step operation (called \verb|step_ctx| in Coq) is correct with
+respect to the iterator \verb|next_tree|.
 
 A key property relating stepping of explicit choice iterators and choice
 string iterators is one described in section 2: if the choice string $c$  can
@@ -848,8 +844,6 @@ the remainder follows from lemma~\ref{lem:snt}. We know that \verb|itp t it| can
 be broken down into a string of the form $c\,\L\,c'$ where $c'$ is solely \Rs, and thus
 the left hand side will be \verb|Some(|$c\,\R\,c''$\verb|)| where $c''$ is some amount of 
 padding \Ls. By lemma~\ref{lem:snt}, the right hand side can be decomposed identically, and the theorem holds.
-
-See \verb|list_step_correct| in the Coq proof for full details.
 \end{proof}
 
 Now, with the relevant properties proven, we can implement and prove correct
@@ -881,8 +875,6 @@ is a supertype of \verb|a|.
 Otherwise, if \verb|it| can take a step, then either we find that \verb|b|
 with \verb|it| and \verb|itp t it| is a supertype of \verb|a|, or we defer to
 the IH.
-
-See \verb|ex_sub_corr_eq| in the Coq proof.
 \end{proof}
 
 \begin{lemma}[Correctness of forall-exists subtype checking with choice strings]
@@ -903,8 +895,6 @@ The proof runs identically to that of \verb|ex_sub_corr_eq|; we run through
 until the base case is reached. At each step, the functions both check that there
 exists some satisfying explicit assignment or choice list for \verb|b| that is a 
 supertype of \verb|a| with \verb|it| or \verb|itp t it|. 
-
-See \verb|fa_sub_corr_eq| in the Coq proof for full details.
 \end{proof}
 
 In conjunction with the negations of above theorems, the choice stack-based algorithm is provably equivalent to the
