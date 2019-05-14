@@ -713,7 +713,7 @@ Fixpoint next(t:Typ)(i:iter t): option(iter t) := match i with
 % put theorems below figure 
 
 We would like to have an induction principle for tree iterators so that
-we can reason about all reachable states at once. We show that all iterators
+we can reason about all iterator states for a type. We show that all iterators
 will eventually reach a terminal state by using a function \c{inum} that assigns
 natural numbers to each state. The \c{inum} function simply counts the number of
 remaining steps in the iterator, using \c{tnum} to count the total number of union-free
@@ -741,13 +741,13 @@ induction principle. At each step, the \c{next} function reduces the
 value of \c{inum} by 1, and since \c{inum} cannot be negative the
 iterator must therefore reach the ending state from every configuration.
 
-\begin{lemma}[Monotonicity of \c{inum}]
+\begin{lemma}[Iterator number monotonicity]
 If $\c{next t it} = it'$ then $\c{inum t it} = 1 + \c{inum t it'}$.
 \end{lemma}
 
 We can now define an induction principle over \c{next}. By the
-monotonicy of \c{inum} \c{next} must eventually reach a terminal state
-from all configruations. If we can prove that our desired property holds
+monotonicy of \c{inum}, \c{next} must eventually reach a terminal state
+from all configurations. If we can prove that our desired property holds
 of the terminal configuration and for the induction step, we can prove it
 holds for every iterator state for that type.
 
