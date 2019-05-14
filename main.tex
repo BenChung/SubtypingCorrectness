@@ -717,10 +717,16 @@ holds of every iterator state over $t$.
 Using \verb|iter_rect|, we can implement and prove correct equivalent functions
 to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
 based on iteration over choice trees.
+
+
 \begin{small}\begin{verbatim}
-Definition exists_iter(a b : Typ) : 
-  ({ t | InType t b /\ BaseSubtype a t } +
-   {forall t, InType t b -> ~(BaseSubtype a t) }).
+let rec exists (a b:typ) (ib:iter b) =
+    (sub a (current_type b ib)) || 
+        (match next b ib with Some(ns) => exists a b ns | None => false)
+let rec allexists (a b:typ) (ia:iter a) =
+    (exists (current_type a ia) b (init b)) && 
+        (match next a ia with Some(ns) => allexists a b ns | None => true)
+let subtype (a b:typ) = allexists a b (init a)
 \end{verbatim}\end{small}
 
 \verb|exists_iter| is equivalent to the choice string based \verb|exists|,
@@ -760,35 +766,29 @@ However, this does not yet prove correct the previous algorithm over choice stri
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Subtyping with Choice Strings}
 
-Our proof of correctness for the choice string based implementation relies 
-upon the choice tree representation. We first define a mechanism to linearize
-choice trees into choice strings, show that stepping the choice tree and linearizing
-is equivalent to linearizing and stepping the choice string, and then use these lemmas
-to prove correctness of the choice string based subtyping algorithm.
-
-The core of our proof is the simple function \verb|itp|, which converts an iterator
-to a choice string. This function performs the inorder depth-first traversal of the
-type tree to convert its choices into a choice string. 
+We prove the subtyping algorithm using choice strings correct by 
+showing that choice string iterators simulate tree iterators. To 
+relate tree iterators to choice string iterators, we use the \c{itp} 
+function, which traverses a tree iterator state and produces a choice
+string using a depth-first search.
 
 \begin{small}\begin{verbatim}
-Fixpoint itp(t:Typ)(it:iter t):st_context :=
+Fixpoint itp(t:Typ)(it:iter t):choice list :=
    match it with
    | IPrim _ => nil
    | ITuple t1 t2 it1 it2 => (itp t1 it1) ++ (itp t2 it2)
-   | IUnionL t1 _ it1 => false :: (itp t1 it1)
-   | IUnionR _ t2 it1 => true :: (itp t2 it1)
+   | ILeft t1 _ it1 => Left :: (itp t1 it1)
+   | IRight _ t2 it1 => Right :: (itp t2 it1)
    end.
 \end{verbatim}\end{small}
 
-Stepping in the Coq implementation is as described above. It only remains to
-show that this step operation (called \verb|step_ctx| in Coq) is correct with
-respect to the iterator \verb|next_tree|.
-
-A key property relating stepping of tree iterators and choice
-string iterators is one described in section 2: if the choice string $c$  can
-be decomposed as $c=c_h\,\L\,c_t$ where $c_t$ consists solely of \Rs. When we
-step it, we should end up with a new choice string $c'=c_h\,\R\,c_t'$ where
-$c_t'$ consists solely of \Ls. We formalize this as lemma~\ref{lem:snt}.
+Then, the translated input and output of the tree iterator \c{next}
+function is of the form described in section~\ref{cs}. A choice tree \c{it}
+that can be stepped will be turned by \c{itp} into a list of the form
+\c{hd ++ (L :: tl)}, where \c{hd} is some prefix and \c{tl} is a list of 
+all \Rs. If we then step \c{it} to \c{it2} using \c{next} for trees,
+\c{itp} will turn \c{it2} into a list of the form \c{hd ++ (R :: tl')},
+where \c{tl'} is a list consisting of all-\Ls.
 
 \begin{lemma}[Structure of linearized {\tt next\_tree}]
 \label{lem:snt}
