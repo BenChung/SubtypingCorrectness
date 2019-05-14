@@ -718,7 +718,6 @@ Using \verb|iter_rect|, we can implement and prove correct equivalent functions
 to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
 based on iteration over choice trees.
 
-
 \begin{small}\begin{verbatim}
 let rec exists (a b:typ) (ib:iter b) =
     (sub a (current_type b ib)) || 
@@ -792,39 +791,14 @@ where \c{tl'} is a list consisting of all-\Ls.
 
 \begin{lemma}[Structure of linearized {\tt next\_tree}]
 \label{lem:snt}
-\begin{small}\begin{verbatim}
-forall t it it' ls ls',
-    next_tree t it = Some it' -> itp t it = ls -> itp t it' = ls' ->
-    exists hd tl tl',
-      ls = hd ++ (L :: tl) /\
-      ls' = hd ++ (R :: tl') /\
-      (forall el, In el tl -> el = R) /\
-      (forall el, In el tl' -> el = L).
-\end{verbatim}\end{small}
 If a explicit assignment iterator \verb|it| can take a step to \verb|it'|, then
 the linearized \verb|it| consists of some prefix and a \L-choice followed by a suffix of \Rs.
 The resulting \verb|it'| will then have the same prefix, a \R-choice, and a suffix of \Ls.
 \end{lemma}
-\begin{proof}
-The proof follows from induction over the initial iterator \verb|it|:
-\begin{itemize}
-    \item \verb|IPrim|: Since primitives cannot step, the theorem holds by default.
-    \item \verb|ITuple|: We first attempt to step the second child of the tuple; if it can step, then 
-    we reconstruct the desired output form from the IH. Otherwise, we attempt to step the first child and
-    do the same if it can. If neither can step, then the theorem holds by default.
-    \item \verb|IUnionL|: If the left child can step, then we will invoke the IH and continue. Otherwise,
-    the left child's linearization must consist of all-\Rs and the current \L choice is the one to be flipped. 
-    The remainder follows from padding.
-    \item \verb|IUnionR|: The right child must be able to step. If so, then the theorem holds by the IH.
-    If not then the theorem holds by default, as then \verb|it| is unable to step at all.
-\end{itemize}
-\end{proof}
 
-Lemma~\ref{lem:snt} establishes that as long as the tree iterator can step, the linearized
-version will step in the way that we described in section 2. In the Coq version of this proof, we also
-prove that a terminal tree iterator (e.g. one with no more transitions to take) has a linearized
-form of all \Rs. In conjunction, these theorems then let us prove equivalence between the tree and
-choice string iterators.
+We can then prove that stepping a type iterator state is equivalent to
+stepping the linearized versions of the state using the choice string
+\c{next} function.
 
 
 \begin{lemma}[Correctness of step\_ctx]
