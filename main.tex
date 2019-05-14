@@ -722,7 +722,7 @@ lists of  terms, but instead of computing with union free type terms directly
 they iterate through \c{iter}s for \c a and \c b. These iterators, initalized
 by \c{init} to follow the structure of the type while taking the left choice
 at each choice point, are used in the \c{sub}  function as choice strings
-were.
+were.   
 
 \begin{lstlisting}
 let rec sub = function
@@ -826,28 +826,11 @@ We can then prove that stepping a type iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
-
 \begin{lemma}[Correctness of step\_ctx]
-\begin{small}\begin{verbatim}
-forall t it,
-    step_ctx t (itp t it) = (option_map (itp t) (next_tree t it)).
-\end{verbatim}\end{small}
-For every type \verb|t| and type iterator \verb|it|,
-stepping the choice-list equivalent of \verb|it| will
-produce the same result as converting the result of stepping
-\verb|it|.
+If \c{it} and \c{it'} are tree iterator states and 
+\c{next it = it'}, then \c{next (itp it) = (itp it')}
 \end{lemma}
 \begin{proof}
-If no next state exists from \verb|it|, then
-\verb|itp t it| must consist solely of \Rs. Therefore, \verb|step_ctx| will be \verb|None| as 
-will \verb|next_tree t it| and the theorem holds. 
-
-Otherwise, if there is some step tha can be taken from \verb|it|, then 
-the remainder follows from lemma~\ref{lem:snt}. We know that \verb|itp t it| can
-be broken down into a string of the form $c\,\L\,c'$ where $c'$ is solely \Rs, and thus
-the left hand side will be \verb|Some(|$c\,\R\,c''$\verb|)| where $c''$ is some amount of 
-padding \Ls. By lemma~\ref{lem:snt}, the right hand side can be decomposed identically, and the theorem holds.
-\end{proof}
 
 Now, with the relevant properties proven, we can implement and prove correct
 \verb|exists| and \verb|allexists| in Coq. The function names are the
