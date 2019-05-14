@@ -872,15 +872,23 @@ We can then prove that stepping a type iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
-\begin{lemma}[Correctness of step\_ctx]
+\begin{lemma}[Correctness of step\_ctx]\label{sctxcorr}
 If \c{it} and \c{it'} are tree iterator states and 
 \c{next it = it'}, then \c{next (itp it) = (itp it')}
 \end{lemma}
 
-Now, with the relevant properties proven, we can implement and prove correct
-\verb|exists| and \verb|allexists| in Coq. The function names are the
-same, as are the implementations up to the addition of a fuel parameter (which
-is shown to be unnecessary). 
+Finally, the initial state of a tree iterator linearizes to the
+initial state of a choice string iterator.
+
+\begin{lemma}[Equal Initial States]\label{eqinit}
+\c{itp (initial t) = pad t []}
+\end{lemma}
+
+The functions \verb|exists| and \verb|allexists| for choice string based iterators
+are identical to those for tree iterators, and \verb|subtype| is as described in section~\ref{cs}.
+Correctness follows from the tree iterator correctness theorems as by lemma~\ref{sctxcorr} 
+the choice strings match the tree iterators step-for-step, and by lemma~\ref{eqinit} the initial
+states are identical. Thus, the states explored are equivalent.
 
 \begin{theorem}
 \c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
