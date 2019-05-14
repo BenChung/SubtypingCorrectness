@@ -753,32 +753,32 @@ holds for every iterator state for that type.
 
 \begin{theorem}[Tree Iterator Induction]\label{indprop}
 Let $P$ be any property of tree iterators for some type $t$.  Suppose $P$
-holds of the final state, and whenever $P$ holds of a succesor state $it$
+holds of the final state, and whenever $P$ holds of a successor state $it$
 then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
 holds of every iterator state over $t$.
 \end{theorem} 
 
-\newcommand{\irch}[1]{\ensuremath{|\c{#1}|}}
 Now, we need to prove the subtyping algorithm with tree iterators correct.
 To do so, we first need to characterize the states reachable from a given iterator.
-In order to decide subtyping with tree iterators, we need a version of \c{sub} which
-uses tree iterators instead of choice strings. The tree iterator \c{sub} works by
-simultaneously deconstructing the type and the iterator over the type, following the
-choices specified by the iterator at each choice point encountered. 
+In order to decide subtyping with tree iterators, we need a version of \c{subtype} which
+uses tree iterators instead of choice strings. Like \c{subtype} from section~\ref{cs}, 
+this implementation walks the type trees and the iterator state simultaneously. However,
+as the tree iterators are linked to the specific structure of the type (unlike choice strings), 
+we must break down the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
-let rec sub = function
+let rec subtype = function
     | (Prim(p), Prim(p'), IPrim _, IPrim _) -> p == p'
     | (Tuple(a, a'), Tuple(b, b'), ITuple ia ia', ITuple ib ib') ->
-        sub a b ia ib && sub a' b' ia' ib'
-    | (Union(a,_), b, ILeft _ _ ia, ib) -> sub a b ia ib
-    | (Union(_,a), b, IRight _ _ ia, ib) -> sub a b ia ib
-    | (a, Union(b,_), ia, ILeft _ _ ib) -> sub a b ia ib
-    | (a, Union(_,b), ia, Right _ _ ib) -> sub a b ia ib
+        subtype a b ia ib && subtype a' b' ia' ib'
+    | (Union(a,_), b, ILeft _ _ ia, ib) -> subtype a b ia ib
+    | (Union(_,a), b, IRight _ _ ia, ib) -> subtype a b ia ib
+    | (a, Union(b,_), ia, ILeft _ _ ib) -> subtype a b ia ib
+    | (a, Union(_,b), ia, Right _ _ ib) -> subtype a b ia ib
     | (_, _, _, _) -> false
 
 let rec exist(a b:typ)(ia:iter a)(ib:iter b) =
-   sub a b ia ib  || 
+   subtype a b ia ib  || 
       (match next b ib with 
        | Some(ib') => exist a b ia ib' 
        | None => false)
@@ -792,10 +792,14 @@ let rec allexist (a b:typ)(ia:iter a) =
 let subtype(a b:typ) = allexist a b (initial a)
 \end{lstlisting}
 
-We consider the denotation of a tree iterator state $\irch{i}$ to be the set
-of reachable union-free types from the current state. We also write $\c a(\c
-{ia})$  to indicate the union-free type produced from the type \c a by
-following the choices in the tree iterator \c{ia}.
+\newcommand{\irdn}[1]{\ensuremath{\mathcal{R}(\c{#1})}}
+\newcommand{\irch}[2]{\ensuremath{|\c{#1}|_{#2}}}
+We consider the denotation of a tree iterator state $\irdn{i}$ to be the set
+of states that can be reached using \c{next} from \c{i}. We also write $\c
+a(\c{i})$ to indicate the union-free type produced from the type \c a by
+following the choices in the tree iterator \c{i}. We then define \irch{i}{a} to
+be the set $\{ \c a(\c{i'}) \,|\, \c{i'} \in \irdn{i} \}$, or the set of union-free
+types that result from states in the type \c a reachable by \c{i}.
 
 First, we show that the set of types corresponding to states reachable from
 the initial state is equal to the  set of states denoted by the type itself.
@@ -854,18 +858,14 @@ Fixpoint itp(t:Typ)(it:iter t):choice list :=
 \end{verbatim}\end{small}
 
 Then, the translated input and output of the tree iterator \c{next}
-function is of the form described in section~\ref{cs}. A choice tree \c{it}
-that can be stepped will be turned by \c{itp} into a list of the form
-\c{hd ++ (L :: tl)}, where \c{hd} is some prefix and \c{tl} is a list of 
-all \Rs. If we then step \c{it} to \c{it2} using \c{next} for trees,
-\c{itp} will turn \c{it2} into a list of the form \c{hd ++ (R :: tl')},
-where \c{tl'} is a list consisting of all-\Ls.
+function is of the form described in section~\ref{cs}. 
 
 \begin{lemma}[Structure of linearized {\tt next\_tree}]
 \label{lem:snt}
-If a explicit assignment iterator \verb|it| can take a step to \verb|it'|, then
-the linearized \verb|it| consists of some prefix and a \L-choice followed by a suffix of \Rs.
-The resulting \verb|it'| will then have the same prefix, a \R-choice, and a suffix of \Ls.
+If for some type \c{t} and tree iterators \c{it it'}, \c{next t it = it'},
+then there exists some \c{c' c'' c'''} such that \c{itp t it = c' ++ (Left :: c'')} 
+where \c{c''} consists solely of \Rs and \c{itp t it' = c' ++ (Right :: c''')} where
+\c{c'''} consists solely of \Ls.
 \end{lemma}
 
 We can then prove that stepping a type iterator state is equivalent to
