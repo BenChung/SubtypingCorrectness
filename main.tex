@@ -331,7 +331,7 @@ $\ell_1$ and $\ell_2$ without having to materialize those sets. The
 remainder of this section explains how this is done.
 
 A possible implementation of normalization-based subtyping can be written
-compactly.  The \c{subtypeNF} function takes two types and returns true if
+compactly.  The \c{subtype} function takes two types and returns true if
 they are related by subtyping. It delegates its work to \c{allexist} to
 check that all normalized terms in its first argument have a super-type, and
 to \c{exist} to check that there is at least one super-type in the second
@@ -339,13 +339,13 @@ argument.  The \c{norm} function takes a type term and returns a list of
 union-free terms.
 
 \begin{lstlisting}
-let subtypeNF (a:typ)(b:typ) = allexist a b
+let subtype (a:typ)(b:typ) = allexist (normalize a) (normalize b)
 
 let allexist (a:typ)(b:typ) = 
-  foldl (fun acc a' => acc && exist a' b) true (normalize a)
+  foldl (fun acc a' => acc && exist a' b) true a
 
 let exist (a:typ)(b:list typ) = 
-  foldl (fun acc b' => acc ||  a==b') false (normalize b)
+  foldl (fun acc b' => acc ||  a==b') false b
 
 let rec normalize = function
   | Prim i -> [Prim i]
@@ -497,25 +497,25 @@ union-free type terms in \c a, and checking that for each of them, there
 exists a union-free type term in \c b that is a super-type.
 
 \begin{lstlisting}
-let subtype(a:typ)(b:typ) = allexists a b (initial a)
+let subtype(a:typ)(b:typ) = allexist a b (initial a)
 \end{lstlisting}
 
-The \c{allexists} function take two type terms, \c a and \c b, and a choice
+The \c{allexist} function take two type terms, \c a and \c b, and a choice
 string \c f, and return true if \c a is a subtype of \c b for the iteration
 sequence starting at \c f. This is achieved by recursively testing that for
 each union-free type term in \c a (induced by \c a and the current value of
 \c f), there exists a union-free super-type in \c b.
 
 \begin{lstlisting}
-let rec allexists(a:typ)(b:typ)(f:choice list) =
-  match exists a b f (initial b) with 
+let rec allexist(a:typ)(b:typ)(f:choice list) =
+  match exist a b f (initial b) with 
   | true -> (match next a f with
-             | Some ns -> allexists a b ns 
+             | Some ns -> allexist a b ns 
              | None -> true) 
   | false -> false
 \end{lstlisting}
 
-Similarly, the \c{exists} function takes two type terms, \c a and \c b, and
+Similarly, the \c{exist} function takes two type terms, \c a and \c b, and
 two choice strings, \c f and \c e. It returns true if there exists in \c b, a
 union-free super-type of the type specified by \c f in \c a. This is done by
 recursively iterating through \c e. The determination if two terms are
@@ -524,12 +524,12 @@ related is delegated to the \c{sub} function.
 \begin{lstlisting}
 type res = NotSub | IsSub of choice list * choice list
 
-let rec exists(a:typ)(b:typ)(f:choice list)(e:choice list) =
+let rec exist(a:typ)(b:typ)(f:choice list)(e:choice list) =
   match sub a b f e with 
   | IsSub(_,_) -> true 
   | NotSub -> 
      (match next b e with
-      | Some ns -> exists a b f ns 
+      | Some ns -> exist a b f ns 
       | None -> false) 
 \end{lstlisting}
 
@@ -722,8 +722,8 @@ holds of every iterator state over $t$.
 
 Using \verb|iter_rect|, we can implement and prove correct equivalent
 functions to \verb|exists|, and \verb|allexists|. Therefore, we can prove a
-version of \verb|subtype| based on iteration over choice trees. The \c{exists}
-and \c{allexists} functions work in the same way that they did for normalized
+version of \verb|subtype| based on iteration over choice trees. The \c{exist}
+and \c{allexist} functions work in the same way that they did for normalized
 lists of  terms, but instead of computing with union free type terms directly
 they iterate through \c{iter}s for \c a and \c b. These iterators, initalized
 by \c{init} to follow the structure of the type while taking the left choice
@@ -770,16 +770,16 @@ let rec allexist (a b:typ)(ia:iter a) =
        | Some(ia') => allexist a b ia' 
        | None => true)
 
-let subtype(a b:typ) = allexists a b (initial a)
+let subtype(a b:typ) = allexist a b (initial a)
 \end{lstlisting}
 
-\c{exist} is equivalent to the choice string based \c{exist}, and determines
+The function \c{exist} above is equivalent to the choice string based \c{exist}, and determines
 if there exists some denotationally-contained type in \verb|b| that is a
 supertype of the given \verb|a|. Internally, it is implemented by using
 \verb|iter_rect| to perform induction over the list of remaining states in
 the iterator for \verb|b|. If no states remain, then trivially the failing
 case holds.  Otherwise, it will determine if the current iterator state is a
-supertype of the given \verb|a|. If it is, then it can terminate early with
+supertype of the given \verb|a|. If it is, then it terminates early with
 a successful (left) outcome. Otherwise, it continues with the IH.
 
 \begin{theorem}[]
@@ -793,7 +793,7 @@ Definition forall_iter (a b : Typ) :
   { exists t, In t (clauses a) /\ forall t', InType t' b -> ~ (BaseSubtype t t')}.
 \end{verbatim}\end{small}
 
-\verb|forall_iter| is to \verb|allexists| what \verb|exists_iter| is to
+\verb|forall_iter| is to \verb|allexist| what \verb|exists_iter| is to
 \verb|exists|. Like \verb|exists_iter| it implements the same decision procedure
 as \verb|allexists| (and internally relies upon \verb|exists_iter|), though through
 the abstraction of \verb|iter_rect|.
