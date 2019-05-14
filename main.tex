@@ -769,12 +769,12 @@ we must break down the iterator at every level encountered even if no union is p
 Fixpoint sub (a b:Typ) (i:iter a) (i':iter b) =
     match (a, b, i, i') with
     | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
-    | (Tuple(a, a'), Tuple(b, b'), ITuple ia ia', ITuple ib ib') =>
+    | (Tuple a a', Tuple b b', ITuple ia ia', ITuple ib ib') =>
         subtype(a, b, ia, ib) && subtype(a', b', ia', ib')
-    | (Union(a,_), b, ILeft _ _ ia, ib) => subtype(a, b, ia, ib)
-    | (Union(_,a), b, IRight _ _ ia, ib) => subtype(a, b, ia, ib)
-    | (a, Union(b,_), ia, ILeft _ _ ib) => subtype(a, b, ia, ib)
-    | (a, Union(_,b), ia, Right _ _ ib) => subtype(a, b, ia, ib)
+    | (Union a _, b, ILeft _ _ ia, ib) => subtype(a, b, ia, ib)
+    | (Union _ a, b, IRight _ _ ia, ib) => subtype(a, b, ia, ib)
+    | (a, Union b _, ia, ILeft _ _ ib) => subtype(a, b, ia, ib)
+    | (a, Union _ b, ia, Right _ _ ib) => subtype(a, b, ia, ib)
     | (_, _, _, _) => false
     end.
 \end{lstlisting}
@@ -830,7 +830,7 @@ step then either the current union-free type is satisfying or we defer to the
 IH.
 
 \begin{theorem}\label{trexcor}
-$\c{exist} a b ia ib$ holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
+\c{exist} \c a \c b \c{ia} \c{ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
 \end{theorem}
 
 We can then appeal to both theorem~\ref{trexcor} and lemma~\ref{triter_eq} to show
@@ -840,14 +840,14 @@ in an analogous way to \c{exist} to show that \c{allexist} is correct up to the 
 iterator state.
 
 \begin{theorem}\label{trfacor}
-$\c{allexist} a b ia$ holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\c{allexist} \c a \c b \c{ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
 Finally, we can appeal to theorem~\ref{trfacor} and lemma~\ref{triter_eq} again to show
 that the final subtyping algorithm is correct:
 
 \begin{theorem}\label{trsub}
-$\c{sub} a b$ holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\c{sub} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
 We can thus decide subtyping using choices at tree nodes as our iterator state.
@@ -862,7 +862,7 @@ relate tree iterators to choice string iterators, we use the \c{itp}
 function, which traverses a tree iterator state and produces a choice
 string using a depth-first search.
 
-\begin{small}\begin{verbatim}
+\begin{small}\begin{lstlisting}
 Fixpoint itp(t:Typ)(it:iter t):choice list :=
    match it with
    | IPrim _ => nil
@@ -870,51 +870,67 @@ Fixpoint itp(t:Typ)(it:iter t):choice list :=
    | ILeft t1 _ it1 => Left :: (itp t1 it1)
    | IRight _ t2 it1 => Right :: (itp t2 it1)
    end.
-\end{verbatim}\end{small}
-
-Then, the translated input and output of the tree iterator \c{next}
+\end{lstlisting}\end{small}
+\noindent
+The translated input and output of the tree iterator \c{next}
 function is of the form described in section~\ref{cs}. 
 
 \begin{lemma}[Structure of linearized {\tt next\_tree}]
 \label{lem:snt}
-If for some type \c{t} and tree iterators \c{it it'}, \c{next t it = it'},
-then there exists some \c{c' c'' c'''} such that \c{itp t it = c' ++ (Left :: c'')} 
-where \c{c''} consists solely of \Rs and \c{itp t it' = c' ++ (Right :: c''')} where
-\c{c'''} consists solely of \Ls.
+For some type \c{t} and tree iterators \c{it it'}, if \c{next} \c t \c {it} $=$ \c{it'}, there exists \c{c'}, \c{c''} made up of \Rs, and \c{c'''} consisting of \Ls such that \c{itp t it} $=$ \c{c'} \c @ $(\c{Left} :: \c{c''})$ and \c{itp t it'} $=$ \c{c'} \c @ $(\c{Right} :: \c{c'''})$.
 \end{lemma}
-
+\noindent
 We can then prove that stepping a type iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
 \begin{lemma}[Correctness of step\_ctx]\label{sctxcorr}
 If \c{it} and \c{it'} are tree iterator states and 
-\c{next} it = it', then \c{next} (\c{itp} it) = (\c{itp} it')
+\c{next} it $=$ it', then \c{next} $(\c{itp}\;\c{it}) = (\c{itp}\;\c{it'})$
 \end{lemma}
-
+\noindent
 Finally, the initial state of a tree iterator linearizes to the
 initial state of a choice string iterator.
 
 \begin{lemma}[Equal Initial States]\label{eqinit}
-\c{itp (initial t) = pad t []}
+$\c{itp} (\c{initial}\;\c t) = \c{pad}\;\c t \;\c{[]}$
 \end{lemma}
 
-The functions \verb|exists| and \verb|allexists| for choice string based iterators
-are identical to those for tree iterators, and \verb|subtype| is as described in section~\ref{cs}.
-Correctness follows from the tree iterator correctness theorems as by lemma~\ref{sctxcorr} 
-the choice strings match the tree iterators step-for-step, and by lemma~\ref{eqinit} the initial
-states are identical. Thus, the states explored are equivalsubent.
+The functions \verb|exists| and \verb|allexists| for choice string based
+iterators are identical to those for tree iterators (though using choice
+string iterators internally), and \verb|sub| is as described in
+section~\ref{cs}. The proofs of correctness for the choice string subtype
+decision functions use the tree iterator induction principle
+(theorem~\ref{indprop}), and are thus in terms of tree iterators. By
+lemma~\ref{sctxcorr}, however, each step that the tree iterator takes will be
+mirrored precisely \c{itp} into choice strings. Similarly, the initial states
+are identical by lemma~\ref{eqinit}. As a result, the sequence of states
+checked by each of the iterators is equivalent with \c{itp}.
 
+\begin{lemma}
+\c{exist a b (itp ia) (itp ib)} holds iff $\exists \c t \in \irch{ib}{b}, \c a(\c{ia}) = \c t$
+\end{lemma}
+
+\begin{lemma}\label{cstraec}
+\c{allexist a b (itp ia)} holds iff $\forall \c{a'} \in \irch{ia}{a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\end{lemma}
+
+\noindent We can then instantiate lemma~\ref{cstraec} with lemma~\ref{eqinit} and
+lemma~\ref{triter_eq} to show that \c{allexist} for choice strings ensures
+that the forall-exists relation holds.
+ 
 \begin{theorem}
-\c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
+\c{allexist a b (pad t [])} holds iff $\forall \c{a'} \in \denotes{a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
-\begin{theorem}
-\c{allexist a b ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\noindent Finally, we can prove that subtyping is correct using the choice string algorithm.
+
+\begin{theorem}\label{trsub}
+\c{sub} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
-In this manner, we can provably correctly decide subtyping with distributive unions and tuples using
-the choice list based implementation of iterators.
+Thus, we can correctly decide subtyping with distributive unions and tuples
+using the choice list based implementation of iterators.
 
 \section{Complexity}
 
