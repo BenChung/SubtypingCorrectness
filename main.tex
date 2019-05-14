@@ -714,9 +714,15 @@ holds of every iterator state over $t$.
 \end{theorem} 
 
 
-Using \verb|iter_rect|, we can implement and prove correct equivalent functions
-to \verb|exists|, and \verb|allexists|. Therefore, we can prove a version of \verb|subtype|
-based on iteration over choice trees.
+Using \verb|iter_rect|, we can implement and prove correct equivalent
+functions to \verb|exists|, and \verb|allexists|. Therefore, we can prove a
+version of \verb|subtype| based on iteration over choice trees. The \c{exists}
+and \c{allexists} functions work in the same way that they did for normalized
+lists of  terms, but instead of computing with union free type terms directly
+they iterate through \c{iter}s for \c a and \c b. These iterators, initalized
+by \c{init} to follow the structure of the type while taking the left choice
+at each choice point, are used in the \c{sub}  function as choice strings
+were.
 
 \begin{small}\begin{verbatim}
 let rec sub = function
@@ -727,7 +733,7 @@ let rec sub = function
     | (Union(ta1,ta2), b, IRight ta1 ta2 ita2, itb) -> sub ta2 b ita2 itb
     | (a, Union(tb1,tb2), ita, ILeft tb1 tb2 itb1) -> sub a tb1 ita itb1
     | (a, Union(tb1,tb2), ita, Right tb1 tb2 itb1) -> sub a tb2 ita itb2
-    
+
 let rec exists (a b:typ) (ib:iter b) =
     (sub a (current_type b ib)) || 
         (match next b ib with Some(ns) => exists a b ns | None => false)
