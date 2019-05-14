@@ -643,14 +643,14 @@ Reasoning about iterators that use choice strings, as described in
 Section~\ref{cs}, is tricky as it requires simultaneously reasoning about
 the structure of the type term and the validity of the choice string that
 represents the iterator's state. Instead, a tree iterator ties the two
-together and thus makes reasoning simpler.
+together and thus makes reasoning simpler. 
 
 A tree iterator is a representation of the iteration state embedded in a
 type term. Thus a tree iterator yields a union-free tuple, and given a type
 term, a tree iterator can either step to a successor state or is a terminal
 state. Recalling the graphical notation of Section~\ref{cs}, we can
 represent the state of iteration as a combination of type term and a choice
-or, equivalently as an tree iterator.
+or, equivalently as an tree iterator. 
 
 \medskip
 {\small
@@ -663,6 +663,14 @@ or, equivalently as an tree iterator.
 \end{tabular}}
 
 \noindent
+This structure-dependent construction makes tree iterators less practical
+than choice lists. A tree iterator must store a node for each structural
+element of the type being iterated, and is thus more complex than the simple
+choices-only choice strings. Moreover, tree iterators are practically harder
+to step compared to choice strings, as they lack the efficient bit-set represntation
+of choice strings. However, we prove the algorithm correct for tree iterators 
+first as a logical step to proving choice strings correct.
+
 We define tree iterators dependently on the type that they iterate over. The
 possible states are \c{IPrim} at primitives, \c{ITuple} at tuples, and for
 unions either \c{ILeft} or \c{IRight}.
@@ -760,7 +768,7 @@ holds of every iterator state over $t$.
 
 Now, we need to prove the subtyping algorithm with tree iterators correct.
 In order to decide subtyping with tree iterators, we need a version of \c{sub} which
-uses tree iterators instead of choice strings. Like \c{sub} from section~\ref{cs}, 
+uses tree iterators instead of choice strings. Like \c{sub} from Section~\ref{cs}, 
 this implementation walks the type trees and the iterator state simultaneously. However,
 as the tree iterators are linked to the specific structure of the type (unlike choice strings), 
 we must break down the iterator at every level encountered even if no union is present.
@@ -781,14 +789,14 @@ Fixpoint sub (a b:Typ) (i:iter a) (i':iter b) =
 
 We also need new definitions of \c{exist} and \c{allexist} that use tree iterators. They
 function identically to the algorithm presented for string iterators (though use a different
-iterator representation) in section~\ref{cs}.
+iterator representation) in Section~\ref{cs}.
 
 The function \c{exist} tests if the subtyping relation holds in the context of
 the current iterator states for both sides using \c{sub}. If not, it will
 recur on the next state. Similarly, \c{allexist} will use its iterator for \c
 a in conjunction with \c{exist} to ensure that the current left hand iterator
 state has a matching right hand state. We prove termination of both using the
-\c{inum} measure with lemma~\ref{inum_mono}.
+\c{inum} measure with Lemma~\ref{inum_mono}.
 
 \begin{lstlisting}
 Program Fixpoint exist(a b:typ)(ia:iter a)(ib:iter b) {measure (inum ib)} =
@@ -823,7 +831,7 @@ the initial state is equal to the  set of states denoted by the type itself.
 $\irch{initial a} = \denotes{\c a}$    
 \end{lemma}
 
-Next, we can use theorem~\ref{indprop} as our induction principle to show that
+Next, we can use Theorem~\ref{indprop} as our induction principle to show that
 \c{exist} finds a satisfying instantiation of the right hand side. The desired
 property trivially holds when $\irch{ib} = \emptyset$, and if the iterator can
 step then either the current union-free type is satisfying or we defer to the
@@ -833,9 +841,9 @@ IH.
 \c{exist} \c a \c b \c{ia} \c{ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
 \end{theorem}
 
-We can then appeal to both theorem~\ref{trexcor} and lemma~\ref{triter_eq} to show
+We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq} to show
 that \c{exist a b ia (initial b)} will find a satisfying union-free type on the right
-hand side if it exists in $\denotes{\c b}$. Using this, we can then use theorem~\ref{indprop}
+hand side if it exists in $\denotes{\c b}$. Using this, we can then use Theorem~\ref{indprop}
 in an analogous way to \c{exist} to show that \c{allexist} is correct up to the current 
 iterator state.
 
@@ -843,7 +851,7 @@ iterator state.
 \c{allexist} \c a \c b \c{ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
-Finally, we can appeal to theorem~\ref{trfacor} and lemma~\ref{triter_eq} again to show
+Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq} again to show
 that the final subtyping algorithm is correct:
 
 \begin{theorem}\label{trsub}
@@ -857,7 +865,10 @@ However, this does not yet prove correct the previous algorithm over choice stri
 \subsection{Subtyping with Choice Strings}
 
 We prove the subtyping algorithm using choice strings correct by 
-showing that choice string iterators simulate tree iterators. To 
+showing that choice string iterators simulate tree iterators. Choice strings
+have favorable characteristics compared to tree iterators as they do not require
+redundant structural information to be stored, can be implemented efficiently as 
+bit sets, and  To 
 relate tree iterators to choice string iterators, we use the \c{itp} 
 function, which traverses a tree iterator state and produces a choice
 string using a depth-first search.
@@ -872,15 +883,20 @@ Fixpoint itp(t:Typ)(it:iter t):choice list :=
    end.
 \end{lstlisting}\end{small}
 \noindent
-The translated input and output of the tree iterator \c{next}
-function is of the form described in section~\ref{cs}. 
+Next, in order to show that the choice string iteration order
+is exhibited when linearizing tree iterators into choice strings. 
+The \c{next} function in Section~\ref{cs} worked by finding the last
+\L in the choice string, turning it into an \R, and replacing the rest
+with \Ls until the type was valid. If we \c{itp} translate both the initial
+and final states for a valid \c{next} step of a tree iterator, we see the same
+structure.
 
 \begin{lemma}[Structure of linearized {\tt next\_tree}]
 \label{lem:snt}
-For some type \c{t} and tree iterators \c{it it'}, if \c{next} \c t \c {it} $=$ \c{it'}, there exists \c{c'}, \c{c''} made up of \Rs, and \c{c'''} consisting of \Ls such that \c{itp t it} $=$ \c{c'} \c @ $(\c{Left} :: \c{c''})$ and \c{itp t it'} $=$ \c{c'} \c @ $(\c{Right} :: \c{c'''})$.
+For some type \c{t} and tree iterators \c{it it'}, if \c{next} \c t \c {it} $=$ \c{it'}, there exists some prefix \c{c'}, an initial suffix \c{c''} made up of \Rs, and a final suffix (padding) \c{c'''} consisting of \Ls such that \c{itp t it} $=$ \c{c'} \c @ $(\c{Left} :: \c{c''})$ and \c{itp t it'} $=$ \c{c'} \c @ $(\c{Right} :: \c{c'''})$.
 \end{lemma}
 \noindent
-We can then prove that stepping a type iterator state is equivalent to
+We can then prove that stepping a tree iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
@@ -896,15 +912,15 @@ initial state of a choice string iterator.
 $\c{itp} (\c{initial}\;\c t) = \c{pad}\;\c t \;\c{[]}$
 \end{lemma}
 
-The functions \verb|exists| and \verb|allexists| for choice string based
+The functions \verb|exist| and \verb|allexist| for choice string based
 iterators are identical to those for tree iterators (though using choice
 string iterators internally), and \verb|sub| is as described in
-section~\ref{cs}. The proofs of correctness for the choice string subtype
+Section~\ref{cs}. The proofs of correctness for the choice string subtype
 decision functions use the tree iterator induction principle
-(theorem~\ref{indprop}), and are thus in terms of tree iterators. By
-lemma~\ref{sctxcorr}, however, each step that the tree iterator takes will be
+(Theorem~\ref{indprop}), and are thus in terms of tree iterators. By
+Lemma~\ref{sctxcorr}, however, each step that the tree iterator takes will be
 mirrored precisely \c{itp} into choice strings. Similarly, the initial states
-are identical by lemma~\ref{eqinit}. As a result, the sequence of states
+are identical by Lemma~\ref{eqinit}. As a result, the sequence of states
 checked by each of the iterators is equivalent with \c{itp}.
 
 \begin{lemma}
@@ -915,8 +931,8 @@ checked by each of the iterators is equivalent with \c{itp}.
 \c{allexist a b (itp ia)} holds iff $\forall \c{a'} \in \irch{ia}{a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{lemma}
 
-\noindent We can then instantiate lemma~\ref{cstraec} with lemma~\ref{eqinit} and
-lemma~\ref{triter_eq} to show that \c{allexist} for choice strings ensures
+\noindent We can then instantiate Lemma~\ref{cstraec} with Lemma~\ref{eqinit} and
+Lemma~\ref{triter_eq} to show that \c{allexist} for choice strings ensures
 that the forall-exists relation holds.
  
 \begin{theorem}
@@ -926,11 +942,13 @@ that the forall-exists relation holds.
 \noindent Finally, we can prove that subtyping is correct using the choice string algorithm.
 
 \begin{theorem}\label{trsub}
-\c{sub} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\c{subtype} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
 Thus, we can correctly decide subtyping with distributive unions and tuples
-using the choice list based implementation of iterators.
+using the choice list based implementation of iterators, improving space overhead,
+decreasing representation complexity, and reducing algorithmic complexity compared
+to tree iterators. 
 
 \section{Complexity}
 
