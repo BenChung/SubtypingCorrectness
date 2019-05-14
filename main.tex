@@ -734,7 +734,7 @@ $\irch{initial a} = \denotes{\c a}$
 \end{lemma}
 
 \begin{theorem}
-\c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c t = \c a(\c{ia})$
+\c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
 \end{theorem}
 
 \begin{theorem}
@@ -854,64 +854,13 @@ Now, with the relevant properties proven, we can implement and prove correct
 same, as are the implementations up to the addition of a fuel parameter (which
 is shown to be unnecessary). 
 
-\begin{lemma}[Correctness of existential subtype checking with choice strings]
-\label{lem:correxcst}
-\begin{small}\begin{verbatim}
-forall a b it, 
-  (exists pf, exists_iter_inner a b it = inleft pf) <->
-   exists n, exists a b (iterator_to_path b it) n = Some true.
-\end{verbatim}\end{small}
-For every two types \verb|a| and \verb|b|, the iterator-based algorithm
-\verb|exists_iter_inner| will produce a proof that \verb|a| is a subtype
-of \verb|b| if and only if there is an integer \verb|n| such that
- \verb|exists| given \verb|n| fuel runs producing true.
-\end{lemma}
-\begin{proof}
+\begin{theorem}
+\c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
+\end{theorem}
 
-The proof proceeds by induction on the tree iterator \verb|it|. If
-\verb|it| has no more steps, then \verb|exists_iter_inner| will be true
-(\verb|inleft|, in this encoding) iff the current \verb|it| induces a
-supertype of \verb|a|. Moreover, if \verb|it| cannot step, then neither can
-\verb|itp t it|, so \verb|exits| is only true if the \verb|b| with \verb|itp t it|
-is a supertype of \verb|a|. 
-
-Otherwise, if \verb|it| can take a step, then either we find that \verb|b|
-with \verb|it| and \verb|itp t it| is a supertype of \verb|a|, or we defer to
-the IH.
-\end{proof}
-
-\begin{lemma}[Correctness of forall-exists subtype checking with choice strings]
-\begin{small}\begin{verbatim}
-forall a b it,
-   (exists pf, forall_iter_inner a b it = left pf) <->
-    exists n, allexists a b (itp a it) n = Some true.
-\end{verbatim}
-\end{small}  
-For every two types \verb|a| and \verb|b|, the iterator-based algorithm
-\verb|forall_iter_inner| will produce a proof that \verb|a| is a subtype
-of \verb|b| if and only if there is an integer \verb|n| such that
- \verb|allexists| given \verb|n| fuel runs producing true.
-\end{lemma}
-\begin{proof}
-The proof runs identically to that of \verb|ex_sub_corr_eq|; we run through
-\verb|it| with \verb|iter_rect| stepping \verb|it| and \verb|itp t it| in sync
-until the base case is reached. At each step, the functions both check that there
-exists some satisfying explicit assignment or choice list for \verb|b| that is a 
-supertype of \verb|a| with \verb|it| or \verb|itp t it|. 
-\end{proof}
-
-In conjunction with the negations of above theorems, the choice stack-based algorithm is provably equivalent to the
-iterator-based algorithm. Using the the convenience function \verb|allexists_ex| to generate the needed fuel argument \verb|n|,
-can therefore write a proof-generating subtype implementation that uses choice strings:
-
-\begin{verbatim}
-Definition stack_subtype (a b: type) : {NormalSubtype a b} + {~NormalSubtype a b}.
-Proof.
-  intros. destruct (allexists_ex a b).
-  - left. [...]
-  - right. [...]
-End.
-\end{verbatim}
+\begin{theorem}
+\c{allexist a b ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\end{theorem}
 
 In this manner, we can provably correctly decide subtyping with distributive unions and tuples using
 the choice list based implementation of iterators.
