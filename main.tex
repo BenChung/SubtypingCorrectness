@@ -758,13 +758,6 @@ then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
 holds of every iterator state over $t$.
 \end{theorem} 
 
-We consider the denotation of a tree iterator state $\irdn{i}$ to be the set
-of states that can be reached using \c{next} from \c{i}. We also write $\c
-a(\c{i})$ to indicate the union-free type produced from the type \c a by
-following the choices in the tree iterator \c{i}. We then define \irch{i}{a} to
-be the set $\{ \c a(\c{i'}) \,|\, \c{i'} \in \irdn{i} \}$, or the set of union-free
-types that result from states in the type \c a reachable by \c{i}.
-
 Now, we need to prove the subtyping algorithm with tree iterators correct.
 In order to decide subtyping with tree iterators, we need a version of \c{sub} which
 uses tree iterators instead of choice strings. Like \c{sub} from section~\ref{cs}, 
@@ -815,6 +808,13 @@ Definition subtype(a b:Typ) = allexist a b (initial a)
 
 \newcommand{\irdn}[1]{\ensuremath{\mathcal{R}(\c{#1})}}
 \newcommand{\irch}[2]{\ensuremath{|\c{#1}|_{#2}}}
+
+We consider the denotation of a tree iterator state $\irdn{i}$ to be the set
+of states that can be reached using \c{next} from \c{i}. We also write $\c
+a(\c{i})$ to indicate the union-free type produced from the type \c a by
+following the choices in the tree iterator \c{i}. We then define \irch{i}{a} to
+be the set $\{ \c a(\c{i'}) \,|\, \c{i'} \in \irdn{i} \}$, or the set of union-free
+types that result from states in the type \c a reachable by \c{i}.
 
 First, we show that the set of types corresponding to states reachable from
 the initial state is equal to the  set of states denoted by the type itself.
