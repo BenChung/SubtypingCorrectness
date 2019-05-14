@@ -724,33 +724,44 @@ by \c{init} to follow the structure of the type while taking the left choice
 at each choice point, are used in the \c{sub}  function as choice strings
 were.
 
-\begin{small}\begin{verbatim}
+\begin{lstlisting}
 let rec sub = function
-    | (Prim(p1), Prim(p2), IPrim _, IPrim _) -> p1 == p2
-    | (Tuple(ta1, ta2), Tuple(tb1, tb2), ITuple ita1 ita2, ITuple itb1 itb2) ->
-        sub ta1 tb1 ita1 itb1 && sub ta2 tb2 ita2 itb2
-    | (Union(ta1,ta2), b, ILeft ta1 ta2 ita1, itb) -> sub ta1 b ita1 itb
-    | (Union(ta1,ta2), b, IRight ta1 ta2 ita2, itb) -> sub ta2 b ita2 itb
-    | (a, Union(tb1,tb2), ita, ILeft tb1 tb2 itb1) -> sub a tb1 ita itb1
-    | (a, Union(tb1,tb2), ita, Right tb1 tb2 itb1) -> sub a tb2 ita itb2
+    | (Prim(p), Prim(p'), IPrim _, IPrim _) -> p == p'
+    | (Tuple(a, a'), Tuple(b, b'), ITuple ia ia', ITuple ib ib') ->
+        sub a b ia ib && sub a' b' ia' ib'
+    | (Union(a,_), b, ILeft _ _ ia, ib) -> sub a b ia ib
+    | (Union(_,a), b, IRight _ _ ia, ib) -> sub a b ia ib
+    | (a, Union(b,_), ia, ILeft _ _ ib) -> sub a b ia ib
+    | (a, Union(_,b), ia, Right _ _ ib) -> sub a b ia ib
 
-let rec exists (a b:typ) (ib:iter b) =
-    (sub a (current_type b ib)) || 
-        (match next b ib with Some(ns) => exists a b ns | None => false)
-let rec allexists (a b:typ) (ia:iter a) =
-    (exists (current_type a ia) b (init b)) && 
-        (match next a ia with Some(ns) => allexists a b ns | None => true)
-let subtype (a b:typ) = allexists a b (init a)
-\end{verbatim}\end{small}
+let rec exist(a b:typ)(ia:iter a)(ib:iter b) =
+   sub a b ia ib  || 
+      (match next b ib with 
+       | Some(ib') => exist a b ia ib' 
+       | None => false)
 
-\verb|exists_iter| is equivalent to the choice string based \verb|exists|,
-and determines if there exists some denotationally-contained type in \verb|b|
-that is a supertype of the given \verb|a|. Internally, it is implemented by 
-using \verb|iter_rect| to perform induction over the list of remaining states in
-the iterator for \verb|b|. If no states remain, then trivially the failing case holds.
-Otherwise, it will determine if the current iterator state is a supertype of the given
-\verb|a|. If it is, then it can terminate early with a successful (left) outcome. Otherwise,
-it continues with the IH.
+let rec allexist (a b:typ)(ia:iter a) =
+   exists a b ia (initial b) && 
+      (match next a ia with 
+       | Some(ia') => allexist a b ia' 
+       | None => true)
+
+let subtype(a b:typ) = allexists a b (initial a)
+\end{lstlisting}
+
+\c{exist} is equivalent to the choice string based \c{exist}, and determines
+if there exists some denotationally-contained type in \verb|b| that is a
+supertype of the given \verb|a|. Internally, it is implemented by using
+\verb|iter_rect| to perform induction over the list of remaining states in
+the iterator for \verb|b|. If no states remain, then trivially the failing
+case holds.  Otherwise, it will determine if the current iterator state is a
+supertype of the given \verb|a|. If it is, then it can terminate early with
+a successful (left) outcome. Otherwise, it continues with the IH.
+
+\begin{theorem}[]
+ exist a b ia ib iff 
+\end{theorem}
+
 
 \begin{small}\begin{verbatim}
 Definition forall_iter (a b : Typ) :
