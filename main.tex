@@ -722,7 +722,25 @@ lists of  terms, but instead of computing with union free type terms directly
 they iterate through \c{iter}s for \c a and \c b. These iterators, initalized
 by \c{init} to follow the structure of the type while taking the left choice
 at each choice point, are used in the \c{sub}  function as choice strings
-were.   
+were.
+
+We consider the denotation of a tree iterator state $|\c{i}|$ to be the
+set of reachable union-free types from the current state. We also write $\c a(\c {ia})$ 
+to indicate the union-free type produced from the type \c a by following the choices in
+the tree iterator \c{ia}.
+
+\begin{lemma}[Tree iterator denotational equivalence]
+$|\c{initial a}| = \denotes{\c a}$    
+\end{lemma}
+
+\begin{theorem}
+\c{exist a b ia ib} holds iff $\exists \c t \in |\c{ib}|, \c t = \c a(\c{ia})$
+\end{theorem}
+
+\begin{theorem}
+\c{allexist a b ia} holds iff $\forall \c{a'} \in |\c{ia}|, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\end{theorem}
+
 
 \begin{lstlisting}
 let rec sub = function
@@ -830,7 +848,6 @@ stepping the linearized versions of the state using the choice string
 If \c{it} and \c{it'} are tree iterator states and 
 \c{next it = it'}, then \c{next (itp it) = (itp it')}
 \end{lemma}
-\begin{proof}
 
 Now, with the relevant properties proven, we can implement and prove correct
 \verb|exists| and \verb|allexists| in Coq. The function names are the
