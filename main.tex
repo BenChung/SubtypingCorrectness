@@ -724,21 +724,21 @@ by \c{init} to follow the structure of the type while taking the left choice
 at each choice point, are used in the \c{sub}  function as choice strings
 were.
 
-We consider the denotation of a tree iterator state $|\c{i}|$ to be the
+\newcommand{\irch}[1]{\ensuremath{|\c{#1}|}}
+We consider the denotation of a tree iterator state $\irch{i}$ to be the
 set of reachable union-free types from the current state. We also write $\c a(\c {ia})$ 
 to indicate the union-free type produced from the type \c a by following the choices in
 the tree iterator \c{ia}.
-
 \begin{lemma}[Tree iterator denotational equivalence]
-$|\c{initial a}| = \denotes{\c a}$    
+$\irch{initial a} = \denotes{\c a}$    
 \end{lemma}
 
 \begin{theorem}
-\c{exist a b ia ib} holds iff $\exists \c t \in |\c{ib}|, \c t = \c a(\c{ia})$
+\c{exist a b ia ib} holds iff $\exists \c t \in \irch{ib}, \c t = \c a(\c{ia})$
 \end{theorem}
 
 \begin{theorem}
-\c{allexist a b ia} holds iff $\forall \c{a'} \in |\c{ia}|, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+\c{allexist a b ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
 \end{theorem}
 
 
