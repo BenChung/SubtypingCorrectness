@@ -921,9 +921,10 @@ thereby offering $O(n)$ space complexity.
 Julia's algorithm improves best-case time performance.  Normalization always
 experiences worst case time and space behavior as it has to precompute the
 entire normalized type. Julia's iteration-based algorithm can discover the
-relation between types early. In practice many queries are of the form $uft
-<: union(t_1...t_n)$ where $uft$ is already union-free tuple and thus all
-that Julia needs to do if find one matching tuple in $t_1 ... t_n$.
+relation between types early. In practice many queries are of the form
+$\mathit{uft} <: union(t_1...t_n)$ where $\mathit{uft}$ is already
+union-free tuple and thus all that Julia needs to do if find one matching
+tuple in $t_1 ... t_n$.
 
 \section{Conclusion}
 
