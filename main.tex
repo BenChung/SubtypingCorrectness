@@ -1001,10 +1001,10 @@ thereby offering $O(n)$ space complexity.
 Julia's algorithm improves best-case time performance.  Normalization always
 experiences worst case time and space behavior as it has to precompute the
 entire normalized type. Julia's iteration-based algorithm can discover the
-relation between types early. In practice many queries are of the form
-$\mathit{uft} <: union(t_1...t_n)$ where $\mathit{uft}$ is already
-union-free tuple and thus all that Julia needs to do if find one matching
-tuple in $t_1 ... t_n$.
+relation between types early. In practice, many queries are of the form
+$\mathit{uft} <: union(t_1...t_n)$ where $\mathit{uft}$ is an already
+union-free tuple. As a result, all that Julia needs to do is find one matching
+tuple in $t_1 ... t_n$, which could be handled quickly by a fast path.
 
 \section{Conclusion}
 
@@ -1018,7 +1018,8 @@ Our next steps will be subtyping for primitive tpyes, existential type
 variables, and invariant constructors.  Adding a subtyping to primitive
 types would be the simplest change. The challenge is how to retain
 completeness, as a primitive subtype heirarchy and semantic subtyping have
-undesirable interactions.  For example, if $p_2 \sub p_1$ and $p_3 \sub p_1$, is
+undesirable interactions.  For example, if the primitive subtype hierarchy
+contains both $p_2 \sub p_1$ and $p_3 \sub p_1$, then is
 $p_1$ a subtype of $\union{p_2}{p_3}$? In a semantic subtyping system, they
 are, but this requires changes both to the denotational framework and the
 search space of the iterators.  Existential type variables create
