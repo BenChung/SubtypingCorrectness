@@ -750,7 +750,7 @@ value of \c{inum} by 1, and since \c{inum} cannot be negative the
 iterator must therefore reach the ending state from every configuration.
 
 \begin{lemma}[Iterator number monotonicity]\label{inum_mono}
-If $\c{next} t it = it'$ then $\c{inum} t it = 1 + \c{inum} t it'$.
+If $\c{next}~t~it = it'$ then $\c{inum}~t~it = 1 + \c{inum}~t~it'$.
 \end{lemma}
 
 We can now define an induction principle over \c{next}. By the
@@ -814,52 +814,55 @@ Program Fixpoint allexist (a b:typ)(ia:iter a) {measure (inum ia)} =
 Definition subtype(a b:Typ) = allexist a b (initial a)
 \end{lstlisting}
 
-\newcommand{\irdn}[1]{\ensuremath{\mathcal{R}(\c{#1})}}
-\newcommand{\irch}[2]{\ensuremath{|\c{#1}|_{#2}}}
+\newcommand{\irdn}[1]{\ensuremath{\mathcal{R}({#1})}}
+\newcommand{\irch}[2]{\ensuremath{|#1|_{#2}}}
 
 We consider the denotation of a tree iterator state $\irdn{i}$ to be the set
-of states that can be reached using \c{next} from \c{i}. We also write $\c
-a(\c{i})$ to indicate the union-free type produced from the type \c a by
-following the choices in the tree iterator \c{i}. We then define \irch{i}{a} to
-be the set $\{ \c a(\c{i'}) \,|\, \c{i'} \in \irdn{i} \}$, or the set of union-free
-types that result from states in the type \c a reachable by \c{i}.
+of states that can be reached using \c{next} from $i$. We also write $a(i)$
+to indicate the union-free type produced from the type $a$ by following the
+choices in the tree iterator $i$. We then define \irch{i}{a} to be the set
+$\{a(i')\,|\,i'\in\irdn{i}\}$, or the set of union-free types that result
+from states in the type $a$ reachable by $i$.
 
 First, we show that the set of types corresponding to states reachable from
 the initial state is equal to the  set of states denoted by the type itself.
 
 \begin{lemma}[Tree iterator denotational equivalence]\label{triter_eq}
-$\irch{initial a} = \denotes{\c a}$    
+$\irch{\c{initial}~a}{} = \denotes{a}$    
 \end{lemma}
 
 Next, we can use Theorem~\ref{indprop} as our induction principle to show that
 \c{exist} finds a satisfying instantiation of the right hand side. The desired
-property trivially holds when $\irch{ib} = \emptyset$, and if the iterator can
+property trivially holds when $\irch{i_b} = \emptyset$, and if the iterator can
 step then either the current union-free type is satisfying or we defer to the
 IH.
 
 \begin{theorem}\label{trexcor}
-\c{exist} \c a \c b \c{ia} \c{ib} holds iff $\exists \c t \in \irch{ib}, \c a(\c{ia}) = \c t$
+$\c{exist}\,a\,b\,i_a\,i_b$ holds iff $\exists t\in\irch{i_b},a(i_a)= t$.
 \end{theorem}
 
-We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq} to show
-that \c{exist a b ia (initial b)} will find a satisfying union-free type on the right
-hand side if it exists in $\denotes{\c b}$. Using this, we can then use Theorem~\ref{indprop}
-in an analogous way to \c{exist} to show that \c{allexist} is correct up to the current 
-iterator state.
+We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq}
+to show that $\c{exist}\,a\,b\,i_a\,(\c{initial}\,b)$ will find a satisfying
+union-free type on the right hand side if it exists in $\denotes{b}$. Using
+this, we can then use Theorem~\ref{indprop} in an analogous way to \c{exist}
+to show that \c{allexist} is correct up to the current iterator state.
 
 \begin{theorem}\label{trfacor}
-\c{allexist} \c a \c b \c{ia} holds iff $\forall \c{a'} \in \irch{ia}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+$\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{},
+  \exists b'\in \denotes{b}, a'= b'$.
 \end{theorem}
 
-Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq} again to show
-that the final subtyping algorithm is correct:
+Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq}
+again to show that the final subtyping algorithm is correct:
 
 \begin{theorem}\label{trsub}
-\c{sub} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+$\c{sub}\,a\,b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
+  \denotes{b}, a' = b'$.
 \end{theorem}
 
-We can thus decide subtyping using choices at tree nodes as our iterator state.
-However, this does not yet prove correct the previous algorithm over choice strings.
+We can thus decide subtyping using choices at tree nodes as our iterator
+state.  However, this does not yet prove correct the previous algorithm over
+choice strings.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Subtyping with Choice Strings}
