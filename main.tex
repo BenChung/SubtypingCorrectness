@@ -263,13 +263,12 @@ requirement of the algorithm is bounded by the number of unions in the type
 terms being checked. We prove in Coq that the algorithm is correct and
 complete with respect to a standard semantic subtyping model.
 
-To avoid being drawn in the vast complexity of Julia's type algebra, we
-focus on a minimal language featuring union, tuples, and primitive
+To avoid being drawn into the vast complexity of Julia's type algebra, we
+focus on a minimal language with union, tuples, and primitive
 types. This tiny language is expressive enough to highlight the decision
 strategy, and make this implementation technique known to a wider audience.
-The full Julia implementation shows that this technique extends, among
-others, to invariant constructors and existential
-types~\cite{DBLP:NardelliBPCBV18}, we expect that it can be leveraged in
+The full Julia implementation shows that this technique extends to to invariant constructors and existential
+types~\cite{DBLP:NardelliBPCBV18}, among others. We expect that it can be leveraged in
 other modern language designs.
 
 \medskip
