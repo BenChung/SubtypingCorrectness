@@ -886,9 +886,8 @@ string iterators, we use the \c{itp} function, which traverses a tree
 iterator state and produces a choice string using a depth-first search.
 
 \newpage
-
 \begin{lstlisting}
-Fixpoint itp(t:Typ)(it:iter t):choice list :=
+Fixpoint itp{t:Typ}(it:iter t):choice list :=
    match it with
    | IPrim _ => nil
    | ITuple t1 t2 it1 it2 => (itp t1 it1)++(itp t2 it2)
@@ -944,10 +943,17 @@ mirrored precisely \c{itp} into choice strings. Similarly, the initial states
 are identical by Lemma~\ref{eqinit}. As a result, the sequence of states
 checked by each of the iterators is equivalent with \c{itp}.
 
-\begin{lemma}
+\begin{lemma}\label{cstrec}
 $\c{exist}~a~b~(\c{itp}~i_a) (\c{itp}~i_b)$ holds iff $\exists t \in
   \irch{i_b}{b}, a(ia)=t$.
 \end{lemma}
+
+With the correctness of \c{exist} following from the tree iterator definition,
+we can apply the same proof methodology to show that \c{allexist} is correct
+when over translated tree iterators. To do so so, we instantiate
+Lemma~\ref{cstrec}  with Lemma~\ref{triter_eq} and Lemma~\ref{eqinit} to show
+that if $\c{exist}\;\c a\;\c b\;(\c{itp}\;\c{ia})\;(\c{pad}\;\c t\;\c{[]})$
+then $\exists \c t \in \denotes{\c b}, \c a(\c{ia}) = \c t$.
 
 \begin{lemma}\label{cstraec}
 $\c{allexist}~a~b (\c{itp}~i_a)$
