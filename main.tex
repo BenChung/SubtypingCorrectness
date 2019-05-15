@@ -88,10 +88,10 @@ Union types, originally introduced by Barbanera and
 Dezani-Ciancaglini~\cite{barbanera1991intersection}, are increasingly being
 used in mainstream languages. In some cases, as Julia~\cite{BezansonEKS17}
 or TypeScript~\cite{typescript}, they are exposed at the source level. In
-others, such as Hack~\cite{hack}, they are only used internally when
-performing type inference. We describe a space-efficient technique for
-computing subtyping between types in the presence of distributive unions.
-Our motivation arises from the Julia programming language. In our previous
+others, such as Hack~\cite{hack}, they are only used internally for
+type inference. We describe a space-efficient technique for
+computing subtyping between types in the presence of distributive unions,
+arising from the Julia programming language. In our previous
 work on formalizing the Julia subtyping
 algorithm~\cite{DBLP:NardelliBPCBV18}, we described the subtyping relation
 but were unable to describe the subtyping algorithm or prove it
