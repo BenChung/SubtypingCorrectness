@@ -904,7 +904,7 @@ Next, in order to show that the choice string iteration order is exhibited
 when linearizing tree iterators into choice strings.  The \c{next} function
 in Section~\ref{cs} worked by finding the last \L in the choice string,
 turning it into an \R, and replacing the rest with \Ls until the type was
-valid. If we \c{itp} translate both the initial and final states for a valid
+valid. If we use \c{itp} to translate both the initial and final states for a valid
 \c{next} step of a tree iterator, we see the same structure.
 
 \begin{lemma}[Linearized Iteration]
