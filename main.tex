@@ -950,10 +950,11 @@ $\c{exist}~a~b~(\c{itp}~i_a) (\c{itp}~i_b)$ holds iff $\exists t \in
 
 With the correctness of \c{exist} following from the tree iterator definition,
 we can apply the same proof methodology to show that \c{allexist} is correct
-when over translated tree iterators. To do so so, we instantiate
+when over translated tree iterators. In order to do so, we instantiate
 Lemma~\ref{cstrec}  with Lemma~\ref{triter_eq} and Lemma~\ref{eqinit} to show
 that if $\c{exist}\;\c a\;\c b\;(\c{itp}\;\c{ia})\;(\c{pad}\;\c t\;\c{[]})$
-then $\exists \c t \in \denotes{\c b}, \c a(\c{ia}) = \c t$.
+then $\exists \c t \in \denotes{\c b}, \c a(\c{ia}) = \c t$, allowing us to check 
+each of the exists cases while establishing the forall-exists relationship.
 
 \begin{lemma}\label{cstraec}
 $\c{allexist}~a~b (\c{itp}~i_a)$
