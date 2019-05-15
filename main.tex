@@ -844,17 +844,19 @@ $\irch{\c{initial}~a}{a} = \denotes{\c a}$.
 \end{lemma}
 
 \noindent
-Next we use, Theorem~\ref{indprop} as the induction principle to show that
-\c{exists} of \c{a}, \c{b}, with \c{ia} and \c{ib} will try to find an iterator
-state \c{ib'} starting from \c{ib} such that $\c b(\c{ib'}) = \c a(\c{ia})$. The
-desired property trivially holds when $\irch{i_b}{b} = \emptyset$, and if
-the iterator can step then either the current union-free type is satisfying
-or we defer to the IH.
+Next, Theorem~\ref{indprop} allows us to show that \c{exists} of $a$, $b$,
+with $i_a$ and $i_b$ will try to find an iterator state $i_b'$ starting from
+$i_b$ such that $b(i_b') = a(i_a)$. The desired property trivially holds
+when $\irch{i_b}{b} = \emptyset$, and if the iterator can step then either
+the current union-free type is satisfying or we defer to the induction
+hypothesis.
+
 
 \begin{theorem}\label{trexcor}
 $\c{exist}\,a\,b\,i_a\,i_b$ holds iff $\exists t\in\irch{i_b}{b},a(i_a)= t$.
 \end{theorem}
 
+\noindent
 We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq}
 to show that $\c{exist}\,a\,b\,i_a\,(\c{initial}\,b)$ will find a satisfying
 union-free type on the right hand side if it exists in $\denotes{b}$. Using
@@ -866,6 +868,7 @@ $\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{a},
   \exists b'\in \denotes{b}, a'= b'$.
 \end{theorem}
 
+\noindent
 Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq}
 again to show that the final subtyping algorithm is correct:
 
