@@ -907,7 +907,7 @@ with \Ls until the type was valid. If we \c{itp} translate both the initial
 and final states for a valid \c{next} step of a tree iterator, we see the same
 structure.
 
-\begin{lemma}[Structure of linearized {\tt next\_tree}]
+\begin{lemma}[Linearized Tree Iteration]
 \label{lem:snt}
 For some type \c{t} and tree iterators \c{it it'}, if \c{next} \c t \c {it} $=$ \c{it'}, there exists some prefix \c{c'}, an initial suffix \c{c''} made up of \Rs, and a final suffix (padding) \c{c'''} consisting of \Ls such that \c{itp t it} $=$ \c{c'} \c @ $(\c{Left} :: \c{c''})$ and \c{itp t it'} $=$ \c{c'} \c @ $(\c{Right} :: \c{c'''})$.
 \end{lemma}
@@ -916,7 +916,7 @@ We can then prove that stepping a tree iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
-\begin{lemma}[Correctness of step\_ctx]\label{sctxcorr}
+\begin{lemma}[Equivalence of Stepping]\label{sctxcorr}
 If \c{it} and \c{it'} are tree iterator states and 
 \c{next} it $=$ it', then \c{next} $(\c{itp}\;\c{it}) = (\c{itp}\;\c{it'})$
 \end{lemma}
