@@ -658,7 +658,7 @@ reasoning simpler.
 
 A tree iterator is a representation of the iteration state embedded in a
 type term. Thus a tree iterator yields a union-free tuple, and given a type
-term, a tree iterator can either step to a successor state or is a terminal
+term, a tree iterator can either step to a successor state or is a final
 state. Recalling the graphical notation of Section~\ref{cs}, we can
 represent the state of iteration as a combination of type term and a choice
 or, equivalently, as a tree iterator.
@@ -731,24 +731,24 @@ Fixpoint next(t:Typ)(i:iter t): option(iter t) := match i with
 % put theorems below figure 
 
 \noindent
-We would like to have an induction principle for tree iterators so that we
-can reason about all iterator states for a type. We show that all iterators
-will eventually reach a terminal state by using a function \c{inum} that
-assigns natural numbers to each state. The \c{inum} function simply counts
-the number of remaining steps in the iterator, using \c{tnum} to count the
-total number of union-free types denoted by some type \c{t} as a helper.
+An induction principle for tree iterators is needed to reason about all
+iterator states for a given type. First, we show that iterators eventually
+reach a final state. This is done with function \c{inum} that assigns
+natural numbers to each state. It simply counts the number of remaining
+steps in the iterator, using \c{tnum} to count the total number of
+union-free types denoted by some type \c{t} as a helper.
 
 \newpage
 
 \begin{lstlisting}
-Fixpoint tnum (t:Typ):nat :=
+Fixpoint tnum(t:Typ):nat :=
   match t with
   | Prim i => 1
   | Tuple t1 t2 => tnum t1 * tnum t2
   | Union t1 t2 => tnum t1 + tnum t2
   end.
 
-Fixpoint inum (t:Typ)(ti:iter t):nat :=
+Fixpoint inum(t:Typ)(ti:iter t):nat :=
   match ti with
   | IPrim i => 0
   | ITuple t1 t2 i1 i2 => inum t1 i1 * total_num t2 + inum t2 i2
@@ -757,20 +757,20 @@ Fixpoint inum (t:Typ)(ti:iter t):nat :=
   end.
 \end{lstlisting}
 
-This \c{inum} function then lets us define the key theorem for our
-induction principle. At each step, the \c{next} function reduces the
-value of \c{inum} by 1, and since \c{inum} cannot be negative the
-iterator must therefore reach the ending state from every configuration.
+\noindent This function then lets us define the key theorem needed for the
+induction principle. At each step, the value of \c{inum} decreases by 1, and
+since it cannot be negative, the iterator must therefore reach a final
+state.
 
-\begin{lemma}[Iterator number monotonicity]\label{inum_mono}
+\begin{lemma}[Monotonicity]\label{inum_mono}
 If $\c{next}~t~it = it'$ then $\c{inum}~t~it = 1 + \c{inum}~t~it'$.
 \end{lemma}
 
-We can now define an induction principle over \c{next}. By the
-monotonicy of \c{inum}, \c{next} must eventually reach a terminal state
-from all configurations. If we can prove that our desired property holds
-of the terminal configuration and for the induction step, we can prove it
-holds for every iterator state for that type.
+\noindent
+It is not possible to define an induction principle over \c{next}. By
+monotonicy, \c{next} eventually reaches a final state.  For any property
+of interest, if we prove that it holds of the final state and for the
+induction step, we can prove it holds for every state for that type.
 
 \begin{theorem}[Tree Iterator Induction]\label{indprop}
 Let $P$ be any property of tree iterators for some type $t$.  Suppose $P$
@@ -779,23 +779,24 @@ then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
 holds of every iterator state over $t$.
 \end{theorem} 
 
-Now, we need to prove the subtyping algorithm with tree iterators correct.
-In order to decide subtyping with tree iterators, we need a version of \c{sub} which
-uses tree iterators instead of choice strings. Like \c{sub} from Section~\ref{cs}, 
-this implementation walks the type trees and the iterator state simultaneously. However,
-as the tree iterators are linked to the specific structure of the type (unlike choice strings), 
-we must break down the iterator at every level encountered even if no union is present.
+Now, one can prove correctness of the subtyping algorithm with tree
+iterators.  A version of \c{sub} which uses tree iterators instead of choice
+strings. Like \c{sub} from Section~\ref{cs}, this implementation walks the
+type trees and the iterator state simultaneously. However, as the tree
+iterators are linked to the specific structure of the type (unlike choice
+strings), we must break down the iterator at every level encountered even if
+no union is present.
 
 \begin{lstlisting}
-Fixpoint sub (a b:Typ) (i:iter a) (i':iter b) =
+Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) =
     match (a, b, i, i') with
     | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
     | (Tuple a a', Tuple b b', ITuple ia ia', ITuple ib ib') =>
         subtype(a, b, ia, ib) && subtype(a', b', ia', ib')
-    | (Union a _, b, ILeft _ _ ia, ib) => subtype(a, b, ia, ib)
-    | (Union _ a, b, IRight _ _ ia, ib) => subtype(a, b, ia, ib)
-    | (a, Union b _, ia, ILeft _ _ ib) => subtype(a, b, ia, ib)
-    | (a, Union _ b, ia, Right _ _ ib) => subtype(a, b, ia, ib)
+    | (Union a _, b, ILeft, _, _, ia, ib)  => subtype(a, b, ia, ib)
+    | (Union _ a, b, IRight, _, _, ia, ib) => subtype(a, b, ia, ib)
+    | (a, Union b _, ia, ILeft, _, _, ib)  => subtype(a, b, ia, ib)
+    | (a, Union _ b, ia, Right, _, _, ib)  => subtype(a, b, ia, ib)
     | (_, _, _, _) => false
     end.
 \end{lstlisting}
