@@ -69,8 +69,8 @@
   multiple methods are applicable for a given call, Julia relies on
   subtyping between method signatures to pick the method to invoke. Julia's
   subtyping algorithm is surprisingly complex, and deciding whether it is
-  correct remains an open question. In this paper, we focus on a piece of
-  the problem, the interaction between union types and covariant
+  correct remains an open question. In this paper, we focus on one piece of
+  this problem: the interaction between union types and covariant
   tuples. Previous work that addressed this particular combination of
   features did so by normalizing types to a disjunctive normal form
   ahead-of-time. Normalization is not practical due to space-explosion for
@@ -977,19 +977,40 @@ tuple in $t_1 ... t_n$.
 
 \section{Conclusion}
 
-We have presented an algorithm for deciding subtyping relationships between
-types that consist of atomic types, tuples, and unions. This algorithm is able
-to decide subtyping relationships in the presence of distributive semantics
-for union types without needing normalization (and therefore using linear
-space) and without additionally constraining type system features.
+We have described and proven correct an algorithm that uses choice lists for deciding
+subtyping relationships between types that consist of atomic types, tuples,
+and unions. This algorithm is able to decide subtyping relationships in the
+presence of distributive semantics for union types without needing
+normalization (and therefore using linear space) and without additionally
+constraining type system features.
 
 Future work includes the extension of the subtyping algorithm to handle a
 richer type language. For the purposes of the Julia language, the most
 important additional features would be primitive type subtyping, existential
-type variables, and invariant type constructors. While not included in Julia,
-arrow types would be another important inclusion, made difficult by the need
-to go from a covariant to a contravariant environment and thus flip the
-forall-exists contexts.
+type variables, and invariant type constructors. Going beyond the type system
+features of Julia, arrow types are another common type system feature not included
+in our current model. Each of these features induces new theoretical complexities.
+
+Adding a subtyping relation to primitives would be the simplest change. The main
+challenge arises from deciding whether to retain completeness, as primitive subtype
+heirarchy and semantic subtyping can combine to create undesirable interactions.
+For example, if we define $p_1,p_2,p_3$ and fix $p_2 <: p_1$ and $p_3 <: p_1$, 
+should $p_1 <: \union{p_2}{p_3}$? In a pure semantic system, they would, and this
+would require changes both to the denotational framework and the search space of the
+iterators.
+
+Existential type variables create substantial new complexities in the state of
+the algorithm. No longer is the state solely restricted to that of the iterators 
+being attempted; now, the state includes variable bounds that are accumulated as the
+algorithm compares types to type variables. As a result, correctness becomes a much more
+complex contextually-linked property to prove.
+
+Finally, invariant type constructors and arrow types pose similar challenges.
+Both can induce contravariant subtyping, which in the context of existential
+type variables has the potential to create cycles within the subtyping
+relation. As a consequence, the termination of our algorithm comes into
+question even if the language is otherwise limited to avoid provable non-
+termination.
 
 \subsubsection*{Acknowledgments}
 The authors thank Jiahao Chen for starting us down the path of understanding
