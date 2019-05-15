@@ -779,13 +779,13 @@ then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
 holds of every iterator state over $t$.
 \end{theorem} 
 
+\noindent
 Now, one can prove correctness of the subtyping algorithm with tree
 iterators.  A version of \c{sub} which uses tree iterators instead of choice
-strings. Like \c{sub} from Section~\ref{cs}, this implementation walks the
-type trees and the iterator state simultaneously. However, as the tree
-iterators are linked to the specific structure of the type (unlike choice
-strings), we must break down the iterator at every level encountered even if
-no union is present.
+strings is required.  This implementation walks type terms and the iterator
+state simultaneously. However, as the tree iterators are linked to the
+specific structure of the type (unlike choice strings), we must break down
+the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
 Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) =
@@ -793,17 +793,18 @@ Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) =
     | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
     | (Tuple a a', Tuple b b', ITuple ia ia', ITuple ib ib') =>
         subtype(a, b, ia, ib) && subtype(a', b', ia', ib')
-    | (Union a _, b, ILeft, _, _, ia, ib)  => subtype(a, b, ia, ib)
-    | (Union _ a, b, IRight, _, _, ia, ib) => subtype(a, b, ia, ib)
-    | (a, Union b _, ia, ILeft, _, _, ib)  => subtype(a, b, ia, ib)
-    | (a, Union _ b, ia, Right, _, _, ib)  => subtype(a, b, ia, ib)
+    | (Union a _, b, ILeft _ _ ia ib)   => sub(a, b, ia, ib)
+    | (Union _ a, b, IRight _ _ ia ib)  => sub(a, b, ia, ib)
+    | (a, Union b _, ia, ILeft _ _ ib)  => sub(a, b, ia, ib)
+    | (a, Union _ b, ia, Right _ _ ib)  => sub(a, b, ia, ib)
     | (_, _, _, _) => false
     end.
 \end{lstlisting}
 
-We also need new definitions of \c{exist} and \c{allexist} that use tree iterators. They
-function identically to the algorithm presented for string iterators (though use a different
-iterator representation) in Section~\ref{cs}.
+We also need new definitions of \c{exist} and \c{allexist} that use tree
+iterators. They function identically to the algorithm presented for string
+iterators (though use a different iterator representation) in
+Section~\ref{cs}.
 
 The function \c{exist} tests if the subtyping relation holds in the context of
 the current iterator states for both sides using \c{sub}. If not, it will
