@@ -209,16 +209,17 @@ other features of the type system. For instance, Julia supports invariant
 constructors, which are incompatible with union normalization. For example,
 the type $\arrayt{\xt{Int}}$ is an array of integers, this type is not be a
 subtype of $\arrayt{\xt{Any}}$. This seemingly simple feature, in
-conjunction with type variables, makes normalization ineffective.
-Consider the type {\small \(\arrayt{\union{t'}{t''}}\)}. This type denotes the set
-of arrays whose elements are either of type {\small $t'$} or {\small   $t''$}.
+conjunction with type variables, makes normalization ineffective.  Consider
+the type {\small \(\arrayt{\union{t'}{t''}}\)}. This type denotes the set of
+arrays whose elements are either of type {\small $t'$} or {\small $t''$}.
 It would be incorrect to rewrite it as {\small
-\(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as this latter type denotes the set of
-arrays whose elements are either all of type {\small $t'$} or all of type
-{\small$t''$}. A weaker disjunctive normal form, only lifting union types
-inside each invariant constructor, can circumvent this problem. However, doing
-so only to reveals a deeper problem in thfe presence of both invariant
-constructors and {existential types}. This is illustrated by the following judgment:
+  \(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as this latter type denotes the
+set of arrays whose elements are either all of type {\small $t'$} or all of
+type {\small$t''$}. A weaker disjunctive normal form, only lifting union
+types inside each invariant constructor, can circumvent this
+problem. However, doing so only to reveals a deeper problem in thfe presence
+of both invariant constructors and {existential types}. This is illustrated
+by the following judgment:
 
 %
 \vspace{-3mm}{\small\[
@@ -232,9 +233,9 @@ Since all types are in weak normal form, an algorithm based on the standard
 system of judgment rules would strip off the array type constructors and
 proceed.  However, since type constructors are invariant on their arguments,
 it must first test that the relation holds in the original order (e.g. that
-$\union{\tuple{t}}{\tuple{t}} <: \tuple{T}$) and in the reverse order (that
-$\tuple{T} <: \union{\tuple{t}}{\tuple{t'}}$). It is in this combined check
-that we run into problems.
+{\small$\union{\tuple{t}}{\tuple{t}}<:\tuple{T}$}) and in the reverse order
+(that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}). It is in this
+combined check that we run into problems.
 %
 The original order subtype check can be concluded without issue, producing
 the constraint on $T$ {\small$\union{t}{t'} <: T$}. However, this constraint
@@ -261,14 +262,14 @@ requirement of the algorithm is bounded by the number of unions in the type
 terms being checked. We prove in Coq that the algorithm is correct and
 complete with respect to a standard semantic subtyping model.
 
-To avoid being drawn in the vast complexity of Julia type algebra, we focus
-on a minimal language featuring union, tuples, and primitive types. This
-tiny language is expressive enough to highlight the decision strategy, and
-make this implementation technique known to a wider audience.  The full
-Julia implementation shows that this technique extends, among others, to
-invariant constructors and existential types~\cite{DBLP:NardelliBPCBV18}, we
-expect that it can be leveraged in other modern language
-designs. 
+To avoid being drawn in the vast complexity of Julia's type algebra, we
+focus on a minimal language featuring union, tuples, and primitive
+types. This tiny language is expressive enough to highlight the decision
+strategy, and make this implementation technique known to a wider audience.
+The full Julia implementation shows that this technique extends, among
+others, to invariant constructors and existential
+types~\cite{DBLP:NardelliBPCBV18}, we expect that it can be leveraged in
+other modern language designs.
 
 \medskip
 Our mechanized proof and artifact is available at: \url{https://benchung.github.io/subtype-artifact/}.
