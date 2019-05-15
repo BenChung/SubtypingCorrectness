@@ -840,7 +840,7 @@ corresponding to states reachable from the initial state of an iterator is
 equal to the set of states denoted by the type itself.
 
 \begin{lemma}[Initial equivalence]\label{triter_eq}
-$\irch{\c{initial}~a}{a} = \denotes{\c a}$.
+$\irch{\c{initial}~a}{a} = \denotes{a}$.
 \end{lemma}
 
 \noindent
@@ -870,68 +870,69 @@ $\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{a},
 
 \noindent
 Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq}
-again to show that the final subtyping algorithm is correct:
+again to show the subtyping algorithm to be correct.
 
 \begin{theorem}\label{trsub}
-$\c{sub}\,a\,b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
+$\c{subtype}\,a\,b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
   \denotes{b}, a' = b'$.
 \end{theorem}
-
-We can thus decide subtyping using choices at tree nodes as our iterator
-state.  However, this does not yet prove correct the previous algorithm over
-choice strings.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Subtyping with Choice Strings}
 
-We prove the subtyping algorithm using choice strings correct by 
-showing that choice string iterators simulate tree iterators. Choice strings
-have favorable characteristics compared to tree iterators as they do not require
-redundant structural information to be stored, can be implemented efficiently as 
-bit sets, and  To 
-relate tree iterators to choice string iterators, we use the \c{itp} 
-function, which traverses a tree iterator state and produces a choice
-string using a depth-first search.
+We prove the subtyping algorithm using choice strings by showing that string
+iterators simulate tree iterators.  To relate tree iterators to choice
+string iterators, we use the \c{itp} function, which traverses a tree
+iterator state and produces a choice string using a depth-first search.
 
-\begin{small}\begin{lstlisting}
+\newpage
+
+\begin{lstlisting}
 Fixpoint itp(t:Typ)(it:iter t):choice list :=
    match it with
    | IPrim _ => nil
-   | ITuple t1 t2 it1 it2 => (itp t1 it1) ++ (itp t2 it2)
-   | ILeft t1 _ it1 => Left :: (itp t1 it1)
-   | IRight _ t2 it1 => Right :: (itp t2 it1)
+   | ITuple t1 t2 it1 it2 => (itp t1 it1)++(itp t2 it2)
+   | ILeft t1 _ it1 => Left::(itp t1 it1)
+   | IRight _ t2 it1 => Right::(itp t2 it1)
    end.
-\end{lstlisting}\end{small}
-\noindent
-Next, in order to show that the choice string iteration order
-is exhibited when linearizing tree iterators into choice strings. 
-The \c{next} function in Section~\ref{cs} worked by finding the last
-\L in the choice string, turning it into an \R, and replacing the rest
-with \Ls until the type was valid. If we \c{itp} translate both the initial
-and final states for a valid \c{next} step of a tree iterator, we see the same
-structure.
+\end{lstlisting}
 
-\begin{lemma}[Linearized Tree Iteration]
+\noindent
+Next, in order to show that the choice string iteration order is exhibited
+when linearizing tree iterators into choice strings.  The \c{next} function
+in Section~\ref{cs} worked by finding the last \L in the choice string,
+turning it into an \R, and replacing the rest with \Ls until the type was
+valid. If we \c{itp} translate both the initial and final states for a valid
+\c{next} step of a tree iterator, we see the same structure.
+
+\begin{lemma}[Linearized Iteration]
 \label{lem:snt}
-For some type \c{t} and tree iterators \c{it it'}, if \c{next} \c t \c {it} $=$ \c{it'}, there exists some prefix \c{c'}, an initial suffix \c{c''} made up of \Rs, and a final suffix (padding) \c{c'''} consisting of \Ls such that \c{itp t it} $=$ \c{c'} \c @ $(\c{Left} :: \c{c''})$ and \c{itp t it'} $=$ \c{c'} \c @ $(\c{Right} :: \c{c'''})$.
+For some type $t$ and tree iterators $\mathit{it}\,\mathit{it}'$, if
+$\c{next}\,t\,\mathit{it}=\mathit{it'}$, there exists some prefix  $c'$, an
+initial suffix $c''$ made up of \Rs, and a final suffix  $c'''$
+consisting of \Ls such that $\c{itp}~t~it=c'\,\c{Left}\,c''$ and 
+$\c{itp}~t~it'=c'\,\c{Right}\,c'''$.
 \end{lemma}
+
 \noindent
 We can then prove that stepping a tree iterator state is equivalent to
 stepping the linearized versions of the state using the choice string
 \c{next} function.
 
-\begin{lemma}[Equivalence of Stepping]\label{sctxcorr}
-If \c{it} and \c{it'} are tree iterator states and 
-\c{next} it $=$ it', then \c{next} $(\c{itp}\;\c{it}) = (\c{itp}\;\c{it'})$
+\begin{lemma}[Step Equivalence]\label{sctxcorr}
+If $\mathit{it}$ and $\mathit{it'}$ are tree iterator states and
+$\c{next}~\mathit{it}=\mathit{it}'$, then $\c{next} (\c{itp}\;\mathit{it}) =
+(\c{itp}\;\mathit{it'})$.
 \end{lemma}
 \noindent
 Finally, the initial state of a tree iterator linearizes to the
 initial state of a choice string iterator.
 
-\begin{lemma}[Equal Initial States]\label{eqinit}
-$\c{itp} (\c{initial}\;\c t) = \c{pad}\;\c t \;\c{[]}$
+\begin{lemma}[Initial Equivalence]\label{eqinit}
+$\c{itp} (\c{initial}\;t) = \c{pad}\;t\;\c{[]}$.
 \end{lemma}
 
+\noindent
 The functions \verb|exist| and \verb|allexist| for choice string based
 iterators are identical to those for tree iterators (though using choice
 string iterators internally), and \verb|sub| is as described in
@@ -944,31 +945,35 @@ are identical by Lemma~\ref{eqinit}. As a result, the sequence of states
 checked by each of the iterators is equivalent with \c{itp}.
 
 \begin{lemma}
-\c{exist a b (itp ia) (itp ib)} holds iff $\exists \c t \in \irch{ib}{b}, \c a(\c{ia}) = \c t$
+$\c{exist}~a~b~(\c{itp}~i_a) (\c{itp}~i_b)$ holds iff $\exists t \in
+  \irch{i_b}{b}, a(ia)=t$.
 \end{lemma}
 
 \begin{lemma}\label{cstraec}
-\c{allexist a b (itp ia)} holds iff $\forall \c{a'} \in \irch{ia}{a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+$\c{allexist}~a~b (\c{itp}~i_a)$
+ holds iff $\forall a'\in\irch{i_a}{a}, \exists b'\in\denotes{b},a'=b'$.
 \end{lemma}
 
-\noindent We can then instantiate Lemma~\ref{cstraec} with Lemma~\ref{eqinit} and
-Lemma~\ref{triter_eq} to show that \c{allexist} for choice strings ensures
-that the forall-exists relation holds.
+\noindent We can then instantiate Lemma~\ref{cstraec} with
+Lemma~\ref{eqinit} and Lemma~\ref{triter_eq} to show that \c{allexist} for
+choice strings ensures that the forall-exists relation holds.
  
 \begin{theorem}
-\c{allexist a b (pad t [])} holds iff $\forall \c{a'} \in \denotes{a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+$\c{allexist}~a~b~(\c{pad}~t~\c{[]})$
+ holds iff $\forall a'\in\denotes{a},\exists b'\in\denotes{b}, a'=b'$.
 \end{theorem}
 
-\noindent Finally, we can prove that subtyping is correct using the choice string algorithm.
+\noindent Finally, we can prove that subtyping is correct using the choice
+string algorithm.
 
 \begin{theorem}\label{trsub}
-\c{subtype} \c a \c b holds iff $\forall \c{a'} \in \denotes{\c a}, \exists \c{b'} \in \denotes{\c b}, \c{a'} = \c{b'}$
+$\c{subtype}~a~b$ holds iff $\forall a'\in\denotes{a}, \exists
+  b'\in\denotes{b}, a'=b'$.
 \end{theorem}
 
+\noindent
 Thus, we can correctly decide subtyping with distributive unions and tuples
-using the choice list based implementation of iterators, improving space overhead,
-decreasing representation complexity, and reducing algorithmic complexity compared
-to tree iterators. 
+using the choice list based implementation of iterators.
 
 \section{Complexity}
 
