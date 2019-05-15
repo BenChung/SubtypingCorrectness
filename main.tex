@@ -446,7 +446,7 @@ string has no \L, then \c{toggle} returns empty, and \c{step} returns
 \newpage
 
 \begin{lstlisting}
-let step (l:choice list) =
+let step(l:choice list) =
   match rev (toggle (rev l)) with
   | [] -> None
   | hd::tl -> Some(hd::tl)
@@ -457,6 +457,7 @@ let rec toggle = function
   | R::tl -> toggle tl
 \end{lstlisting}
 
+\noindent
 The \c{pad} function takes a type term and a choice string to be padded. It
 returns a pair, the first element is the padded string and the second is
 remaining string. \c{pad} traverses the term, visiting both side of each
@@ -481,6 +482,7 @@ let rec pad t l =
    | (Union(t,_),[]) -> (L::(fst(pad t [])),[])
 \end{lstlisting}
 
+\noindent
 To obtain the initial choice string, the string only composed of \Ls, it
 suffices to call \c{pad} with the type term under consideration and an empty
 list. The first element of the returned tuple is the initial choice
@@ -617,8 +619,8 @@ t_2'$.\label{dfn:scr}
 \end{definition}
 
 \noindent
-Note that the use of equality for relating types is a simplification
-afforded by the structure of primitive types.
+The use of equality for relating types is a simplification afforded by the
+structure of primitives.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Subtyping with Normalization}
@@ -651,15 +653,16 @@ Therefore, normalization based subtyping is correct against our definition.
 Reasoning about iterators that use choice strings, as described in
 Section~\ref{cs}, is tricky as it requires simultaneously reasoning about
 the structure of the type term and the validity of the choice string that
-represents the iterator's state. Instead, a tree iterator ties the two
-together and thus makes reasoning simpler. 
+represents the iterator's state. Instead, we propose to use an intermediate
+data structure called a tree iterator to tie the two together and thus makes
+reasoning simpler.
 
 A tree iterator is a representation of the iteration state embedded in a
 type term. Thus a tree iterator yields a union-free tuple, and given a type
 term, a tree iterator can either step to a successor state or is a terminal
 state. Recalling the graphical notation of Section~\ref{cs}, we can
 represent the state of iteration as a combination of type term and a choice
-or, equivalently as an tree iterator. 
+or, equivalently, as a tree iterator.
 
 \medskip
 {\small
@@ -672,17 +675,15 @@ or, equivalently as an tree iterator.
 \end{tabular}}
 
 \noindent
-This structure-dependent construction makes tree iterators less practical
-than choice lists. A tree iterator must store a node for each structural
-element of the type being iterated, and is thus more complex than the simple
-choices-only choice strings. Moreover, tree iterators are practically harder
-to step compared to choice strings, as they lack the efficient bit-set represntation
-of choice strings. However, we prove the algorithm correct for tree iterators 
-first as a logical step to proving choice strings correct.
+This structure-dependent construction makes tree iterators less efficient
+than choice strings. A tree iterator must have a node for each structural
+element of the type being iterated over, and is thus less space-efficient
+than the simple choices-only strings. However, it is easier to prove
+subtyping correct for tree iterators first.
 
-We define tree iterators dependently on the type that they iterate over. The
-possible states are \c{IPrim} at primitives, \c{ITuple} at tuples, and for
-unions either \c{ILeft} or \c{IRight}.
+Tree iterators depend on the type term they iterate over. The possible
+states are \c{IPrim} at primitives, \c{ITuple} at tuples, and for unions
+either \c{ILeft} or \c{IRight}.
 
 \begin{lstlisting}
 Inductive iter: Typ -> Set :=
@@ -692,11 +693,12 @@ Inductive iter: Typ -> Set :=
 | IRight : forall t1 t2, iter t2 -> iter (Union t1 t2).
 \end{lstlisting}
 
-We can then define a stepping function for tree iterators that proceeds in a
-depth-first, right-to-left order.  We have four cases to worry about. For a
-primitive type, there is no successor state. A tuple steps its second child;
-if that has no successor step, then it steps its first child and reset the
-second child. When given a \c{ILeft} or an \c{IRight} it tries step it only
+\noindent
+The \c{next} function for tree iterators steps in a depth-first,
+right-to-left order.  We have four cases to worry about. For a primitive
+type, there is no successor state. A tuple steps its second child; if that
+has no successor step, then it steps its first child and reset the second
+child. When given a \c{ILeft} or an \c{IRight} it tries step it only
 child. If the child has no successor, an \c{ILeft} steps to an \c{IRight}
 and its child is set to the right child of the corresponding node in the
 type term.
@@ -729,12 +731,15 @@ Fixpoint next(t:Typ)(i:iter t): option(iter t) := match i with
 % text just below theorem 4 is sensible but could be expanded a bit
 % put theorems below figure 
 
-We would like to have an induction principle for tree iterators so that
-we can reason about all iterator states for a type. We show that all iterators
-will eventually reach a terminal state by using a function \c{inum} that assigns
-natural numbers to each state. The \c{inum} function simply counts the number of
-remaining steps in the iterator, using \c{tnum} to count the total number of union-free
-types denoted by some type \c{t} as a helper.
+\noindent
+We would like to have an induction principle for tree iterators so that we
+can reason about all iterator states for a type. We show that all iterators
+will eventually reach a terminal state by using a function \c{inum} that
+assigns natural numbers to each state. The \c{inum} function simply counts
+the number of remaining steps in the iterator, using \c{tnum} to count the
+total number of union-free types denoted by some type \c{t} as a helper.
+
+\newpage
 
 \begin{lstlisting}
 Fixpoint tnum (t:Typ):nat :=
