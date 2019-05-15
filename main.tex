@@ -1018,7 +1018,7 @@ Our next steps will be subtyping for primitive tpyes, existential type
 variables, and invariant constructors.  Adding a subtyping to primitive
 types would be the simplest change. The challenge is how to retain
 completeness, as a primitive subtype heirarchy and semantic subtyping have
-undesirable interactions.  For example, if $p_2 <: p_1$ and $p_3 <: p_1$, is
+undesirable interactions.  For example, if $p_2 \sub p_1$ and $p_3 \sub p_1$, is
 $p_1$ a subtype of $\union{p_2}{p_3}$? In a semantic subtyping system, they
 are, but this requires changes both to the denotational framework and the
 search space of the iterators.  Existential type variables create
