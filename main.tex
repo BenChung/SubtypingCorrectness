@@ -204,7 +204,7 @@ constituent base types, making it impractical to store or to compute with:
 \end{verbatim}
 \end{small}
 
-The second drawback of normalisation is that it does not interact well with
+The second drawback of normalization is that it does not interact well with
 other features of the type system. For instance, Julia supports invariant
 constructors, which are incompatible with union normalization. For example,
 the type $\arrayt{\xt{Int}}$ is an array of integers, this type is not be a
@@ -271,7 +271,7 @@ expect that it can be leveraged in other modern language
 designs. 
 
 \medskip
-Our mechanized proof is available at: \url{github.com/stuff}.
+Our mechanized proof and artifact is available at: \url{https://benchung.github.io/subtype-artifact/}.
 \newpage
 
 \section{A space-efficient subtyping algorithm}
@@ -828,17 +828,17 @@ First, we show that the set of types corresponding to states reachable from
 the initial state is equal to the  set of states denoted by the type itself.
 
 \begin{lemma}[Tree iterator denotational equivalence]\label{triter_eq}
-$\irch{\c{initial}~a}{} = \denotes{a}$    
+$\irch{\c{initial}~a}{a} = \denotes{\c a}$    
 \end{lemma}
 
 Next, we can use Theorem~\ref{indprop} as our induction principle to show that
 \c{exist} finds a satisfying instantiation of the right hand side. The desired
-property trivially holds when $\irch{i_b} = \emptyset$, and if the iterator can
+property trivially holds when $\irch{i_b}{b} = \emptyset$, and if the iterator can
 step then either the current union-free type is satisfying or we defer to the
 IH.
 
 \begin{theorem}\label{trexcor}
-$\c{exist}\,a\,b\,i_a\,i_b$ holds iff $\exists t\in\irch{i_b},a(i_a)= t$.
+$\c{exist}\,a\,b\,i_a\,i_b$ holds iff $\exists t\in\irch{i_b}{b},a(i_a)= t$.
 \end{theorem}
 
 We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq}
@@ -848,7 +848,7 @@ this, we can then use Theorem~\ref{indprop} in an analogous way to \c{exist}
 to show that \c{allexist} is correct up to the current iterator state.
 
 \begin{theorem}\label{trfacor}
-$\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{},
+$\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{a},
   \exists b'\in \denotes{b}, a'= b'$.
 \end{theorem}
 
@@ -981,6 +981,14 @@ types that consist of atomic types, tuples, and unions. This algorithm is able
 to decide subtyping relationships in the presence of distributive semantics
 for union types without needing normalization (and therefore using linear
 space) and without additionally constraining type system features.
+
+Future work includes the extension of the subtyping algorithm to handle a
+richer type language. For the purposes of the Julia language, the most
+important additional features would be primitive type subtyping, existential
+type variables, and invariant type constructors. While not included in Julia,
+arrow types would be another important inclusion, made difficult by the need
+to go from a covariant to a contravariant environment and thus flip the
+forall-exists contexts.
 
 \subsubsection*{Acknowledgments}
 The authors thank Jiahao Chen for starting us down the path of understanding
