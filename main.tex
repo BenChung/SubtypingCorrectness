@@ -788,15 +788,15 @@ specific structure of the type (unlike choice strings), we must break down
 the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
-Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) =
+Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) :=
     match (a, b, i, i') with
     | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
-    | (Tuple a a', Tuple b b', ITuple ia ia', ITuple ib ib') =>
-        subtype(a, b, ia, ib) && subtype(a', b', ia', ib')
-    | (Union a _, b, ILeft _ _ ia ib)   => sub(a, b, ia, ib)
-    | (Union _ a, b, IRight _ _ ia ib)  => sub(a, b, ia, ib)
-    | (a, Union b _, ia, ILeft _ _ ib)  => sub(a, b, ia, ib)
-    | (a, Union _ b, ia, Right _ _ ib)  => sub(a, b, ia, ib)
+    | (Tuple a a', Tuple b b', ITuple _ _ ia ia', ITuple _ _ ib ib') =>
+        sub a b ia ib && sub a b ia' ib'
+    | (Union a _, b, ILeft _ _ ia)   => sub a b ia i'
+    | (Union _ a, b, IRight _ _ ia)  => sub a b ia i'
+    | (a, Union b _, ia, ILeft _ _ ib)  => sub a b i ib
+    | (a, Union _ b, ia, IRight _ _ ib)  => sub a b i ib
     | (_, _, _, _) => false
     end.
 \end{lstlisting}
