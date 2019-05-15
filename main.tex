@@ -342,10 +342,10 @@ union-free terms.
 \begin{lstlisting}
 let subtype (a:typ)(b:typ) = allexist (normalize a) (normalize b)
 
-let allexist (a:typ)(b:typ) = 
+let allexist (a:typ list)(b:typ list) = 
   foldl (fun acc a' => acc && exist a' b) true a
 
-let exist (a:typ)(b:list typ) = 
+let exist (a:typ)(b:typ list) = 
   foldl (fun acc b' => acc ||  a==b') false b
 
 let rec normalize = function
