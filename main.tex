@@ -801,56 +801,54 @@ Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) =
     end.
 \end{lstlisting}
 
-We also need new definitions of \c{exist} and \c{allexist} that use tree
-iterators. They function identically to the algorithm presented for string
-iterators (though use a different iterator representation) in
-Section~\ref{cs}.
-
-The function \c{exist} tests if the subtyping relation holds in the context of
-the current iterator states for both sides using \c{sub}. If not, it will
-recur on the next state. Similarly, \c{allexist} will use its iterator for \c
-a in conjunction with \c{exist} to ensure that the current left hand iterator
-state has a matching right hand state. We prove termination of both using the
-\c{inum} measure with Lemma~\ref{inum_mono}.
+\noindent
+Versions of \c{exist} and \c{allexist} that use tree iterators are given
+next. They are similar to the string iterator functions of Section~\ref{cs}.
+\c{exist} tests if the subtyping relation holds in the context of the
+current iterator states for both sides. If not, it recurs on the next
+state. Similarly, \c{allexist} uses its iterator for $a$ in conjunction with
+\c{exist} to ensure that the current left hand iterator state has a matching
+right hand state. We prove termination of both using Lemma~\ref{inum_mono}.
 
 \begin{lstlisting}
-Program Fixpoint exist(a b:typ)(ia:iter a)(ib:iter b) {measure (inum ib)} =
-   subtype a b ia ib  || 
-      (match next b ib with 
-       | Some(ib') => exist a b ia ib' 
-       | None => false).
+Definition subtype(a b:Typ) = allexist a b (initial a)
 
-Program Fixpoint allexist (a b:typ)(ia:iter a) {measure (inum ia)} =
+Program Fixpoint allexist (a b:typ)(ia:iter a) {measure(inum ia)} =
    exists a b ia (initial b) && 
       (match next a ia with 
        | Some(ia') => allexist a b ia' 
        | None => true).
 
-Definition subtype(a b:Typ) = allexist a b (initial a)
+Program Fixpoint exist(a b:typ)(ia:iter a)(ib:iter b)
+                                      {measure(inum ib)} =
+   subtype a b ia ib  || 
+      (match next b ib with 
+       | Some(ib') => exist a b ia ib' 
+       | None => false).
 \end{lstlisting}
 
 \newcommand{\irdn}[1]{\ensuremath{\mathcal{R}({#1})}}
 \newcommand{\irch}[2]{\ensuremath{|#1|_{#2}}}
 
-We consider the denotation of a tree iterator state $\irdn{i}$ to be the set
-of states that can be reached using \c{next} from $i$. We also write $a(i)$
-to indicate the union-free type produced from the type $a$ by following the
-choices in the tree iterator $i$. We then define \irch{i}{a} to be the set
-$\{a(i')\,|\,i'\in\irdn{i}\}$, or the set of union-free types that result
-from states in the type $a$ reachable by $i$.
+\noindent
+The denotation of a tree iterator state $\irdn{i}$ is the set of states that
+can be reached using \c{next} from $i$. Let $a(i)$ indicate the union-free
+type produced from the type $a$ at $i$, and \irch{i}{a} is the set
+$\{a(i')\,|\,i'\in\irdn{i}\}$, the union-free types that result from states
+in the type $a$ reachable by $i$.  This lets us prove that the set of types
+corresponding to states reachable from the initial state of an iterator is
+equal to the set of states denoted by the type itself.
 
-First, we show that the set of types corresponding to states reachable from
-the initial state is equal to the  set of states denoted by the type itself.
-
-\begin{lemma}[Tree iterator denotational equivalence]\label{triter_eq}
-$\irch{\c{initial}~a}{a} = \denotes{\c a}$    
+\begin{lemma}[Initial equivalence]\label{triter_eq}
+$\irch{\c{initial}~a}{a} = \denotes{\c a}$.
 \end{lemma}
 
-Next, we can use Theorem~\ref{indprop} as our induction principle to show that
-\c{exist} finds a satisfying instantiation of the right hand side. The desired
-property trivially holds when $\irch{i_b}{b} = \emptyset$, and if the iterator can
-step then either the current union-free type is satisfying or we defer to the
-IH.
+\noindent
+Next, Theorem~\ref{indprop} is the induction principle that allows to show
+that \c{exist} finds a satisfying instantiation of the right hand side. The
+desired property trivially holds when $\irch{i_b}{b} = \emptyset$, and if
+the iterator can step then either the current union-free type is satisfying
+or we defer to the IH.
 
 \begin{theorem}\label{trexcor}
 $\c{exist}\,a\,b\,i_a\,i_b$ holds iff $\exists t\in\irch{i_b}{b},a(i_a)= t$.
