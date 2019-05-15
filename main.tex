@@ -844,8 +844,9 @@ $\irch{\c{initial}~a}{a} = \denotes{\c a}$.
 \end{lemma}
 
 \noindent
-Next, Theorem~\ref{indprop} is the induction principle that allows to show
-that \c{exist} finds a satisfying instantiation of the right hand side. The
+Next we use, Theorem~\ref{indprop} as the induction principle to show that
+\c{exists} of \c{a}, \c{b}, with \c{ia} and \c{ib} will try to find an iterator
+state \c{ib'} starting from \c{ib} such that $\c b(\c{ib'}) = \c a(\c{ia})$. The
 desired property trivially holds when $\irch{i_b}{b} = \emptyset$, and if
 the iterator can step then either the current union-free type is satisfying
 or we defer to the IH.
