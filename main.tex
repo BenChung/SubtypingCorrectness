@@ -163,7 +163,7 @@ system of rules violates these ideas. Consider the following judgment:
 \vspace{-3mm}
 %
 
-\noindent Under a semantic subtyping, the judgment should hold. We write the
+\noindent Using the semantic subtyping intuition, the judgment should hold. We write the
 set of values denoted by the type $t$ as {\small $\llbracket t \rrbracket$}.
 The left hand side denotes the values {\small $\{\tuple{v',v''} ~|~ v' \in
   \llbracket t' \rrbracket \cup \llbracket t'' \rrbracket \wedge v'' \in
@@ -176,9 +176,10 @@ this relation from the above rules. According to them, we must pick either
   $\tuple{\union{t'}{t''}, t} \sub \tuple{t'', t}$}. In either case, the
 judgment does not hold.
 
-Some early work~\cite{barbanera1991intersection,Pierce1991} uses
+Some early work~\cite{barbanera1991intersection,Pierce1991,aiken1991implementing} uses
 normalization to decide distributive subtyping between union types, while
-Vouillon~\cite{Vouillon04} does not handle distributivity. Normalization
+Vouillon~\cite{Vouillon04} does not handle distributivity. It remains popular, with
+Muelbrock and Tate using it in their general framework for adding union and itersection types~\cite{muehlboeck2018empowering}. Normalization
 entails rewriting all types into their disjunctive normal form, as unions of
 union-free types, \emph{before} building the derivation. This lifts all
 choices to the top level, avoiding the structural entanglements that cause
