@@ -885,7 +885,7 @@ $\c{allexist}\,a\,b\,i_a$ holds iff $\forall a'\in \irch{i_a}{a},
 Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq}
 again to show the subtyping algorithm to be correct.
 
-\begin{theorem}\label{trsub}
+\begin{theorem}
 $\c{subtype}\,a\,b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
   \denotes{b}, a' = b'$.
 \end{theorem}
@@ -986,7 +986,7 @@ $\c{allexist}~a~b~(\c{pad}~t~\c{[]})$
 \noindent Finally, we can prove that subtyping is correct using the choice
 string algorithm.
 
-\begin{theorem}\label{trsub}
+\begin{theorem}
 $\c{subtype}~a~b$ holds iff $\forall a'\in\denotes{a}, \exists
   b'\in\denotes{b}, a'=b'$.
 \end{theorem}
