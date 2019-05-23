@@ -798,11 +798,7 @@ iterators.  A version of \c{sub} which uses tree iterators instead of choice
 strings is required.  This implementation walks type terms and the iterator
 state simultaneously. However, as the tree iterators are linked to the
 specific structure of the type (unlike choice strings), we must break down
-the iterator at every level encountered even if no union is present. Notably,
-this is not correct Coq code: the function is not simply recursive and the Coq
-termination checker cannot guarantee termination. To avoid this, we use 
-\c{Program Fixpoint} using the sum of the sizes of \c{a} and \c{b} as the
-metric.
+the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
 Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) :=
