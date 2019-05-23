@@ -100,10 +100,11 @@ correct. Indeed, we found bugs and were left with unresolved issues.
 Julia's subtyping algorithm~\cite{bezansonthesis} is an important part of its semantics. Julia is
 a dynamically typed language where methods are annotated with type
 signatures to enable multiple dispatch. During program execution, Julia must
-determine which method to invoke at each call site. It does so by finding
+determine which method to invoke at each call site; for this, it searches
 the most specific applicable method (according to subtyping) that applies
-for a given invocation. For example, the following snippet shows three declarations of
-multiplication.
+for a given invocation. 
+The following snippet shows three declarations of
+multiplication:
 
 \begin{lstlisting}
  *(x::Number, r::Range)  = range(x*first(r),...)
@@ -117,13 +118,16 @@ third method invokes native multiplication when both arguments are either
 signed or unsigned integers (but not a mix of the two). Julia will use subtyping
 to decide which of the methods will be invoked for any specific invocation. 
 
-To allow the expression of complex relationships in type signature, Julia offers programmers a rich type language. Julia's types include nominal single
+To allow the expression of complex relationships in type signature, Julia
+offers programmers a rich type language. Julia's types include nominal single
 subtyping, union types, existential types, covariant tuples, invariant
-parametric datatypes, and singleton types. These features are widely used in
-libraries, but pose challenges for subtyping. The design of subtyping was
-inspired by semantic subtyping~\cite{Frisch02,BezansonEKS17}, and while Julia's 
-types do not precisely abide by a semantic set-theoretic intuition, its subtyping
-algorithm must handle many of the same problems.
+parametric datatypes, and singletons. These are all widely used in
+libraries, but pose challenges for subtyping.  Julia's design~\cite{BezansonEKS17} was 
+inspired by semantic subtyping~\cite{Frisch02}, and while its
+types do not precisely abide by a semantic set-theoretic intuition, its
+subtyping
+algorithm
+must handle many of the same problems.
 
 This paper documents the first steps towards proving the correctness of
 Julia's subtyping algorithm. We focus on the interaction of two features:
@@ -178,10 +182,15 @@ this relation from the above rules. According to them, we must pick either
   $\tuple{\union{t'}{t''}, t} \sub \tuple{t'', t}$}. In either case, the
 judgment does not hold. How can this problem be solved?
 
-Some early work~\cite{barbanera1991intersection,Pierce1991,aiken1991implementing} uses
-normalization to decide distributive subtyping between union types, while
-Vouillon~\cite{Vouillon04} does not handle distributivity. Normalization remains popular, with
-Muelbrock and Tate using it in their general framework for union and itersection types~\cite{muehlboeck2018empowering}. Normalization
+Some early work~\cite{barbanera1991intersection,Pierce1991,aiken1991implementing} focused
+normalization to decide distributive subtyping between union types,
+while~\cite{DBLP:conf/tacs/Damm94} explores how to reduce subtyping to regular tree
+expression inclusion.
+Other designs, as Vouillon~\cite{Vouillon04} or Dunfield~\cite{DBLP:journals/jfp/Dunfield14} do not handle distributivity. These days normalization remains popular, and, for instance, it is
+relied upon by Frisch et al.\ work on semantic subtyping~\cite{Frisch08}, by Pearce
+flow-typing algorithm~\cite{DBLP:conf/vmcai/Pearce13}, and by
+Muelbrock and Tate in their general framework for union and intersection
+types~\cite{muehlboeck2018empowering}. Normalization
 entails rewriting all types into their disjunctive normal form, as unions of
 union-free types, \emph{before} building the derivation. This lifts all
 choices to the top level, avoiding the structural entanglements that cause
@@ -189,7 +198,8 @@ trouble. The correctness of this rewriting step comes from the
 semantic-subtyping denotational model~\cite{Frisch08}, and the resulting
 subtype algorithm can be proved both correct and complete. However, this
 algorithm has two major drawbacks: it is not space efficient, and it does not
-interact well with other features of Julia.
+interact well with the other features of Julia.
+\nopagebreak
 
 The first drawback is that normalization can lead to exponentially
 bigger types. Real-world Julia code has types like the
@@ -221,7 +231,7 @@ It would be incorrect to rewrite it as {\small
 set of arrays whose elements are either all of type {\small $t'$} or all of
 type {\small$t''$}. A weaker disjunctive normal form, only lifting union
 types inside each invariant constructor, can circumvent this
-problem. However, doing so only to reveals a deeper problem caused by the presence
+problem. However, doing so only reveals a deeper problem caused by the presence
 of both invariant constructors and {existential types}. This is illustrated
 by the following judgment:
 
@@ -276,7 +286,7 @@ that it can be leveraged in other modern language designs.
 
 \medskip
 Our mechanized proof is available at: {\small\url{benchung.github.io/subtype-artifact}}.
-\newpage
+%\newpage
 
 \section{A space-efficient subtyping algorithm}
 
@@ -509,8 +519,8 @@ let subtype(a:typ)(b:typ) = allexist a b (initial a)
 \end{lstlisting}
 
 \noindent
-The \c{allexist} function take two type terms, \c a and \c b, and a choice
-string \c f, and return true if \c a is a subtype of \c b for the iteration
+The \c{allexist} function takes two type terms, \c a and \c b, and a choice
+string \c f, and returns true if \c a is a subtype of \c b for the iteration
 sequence starting at \c f. This is achieved by recursively testing that for
 each union-free type term in \c a (induced by \c a and the current value of
 \c f), there exists a union-free super-type in \c b.
@@ -560,16 +570,16 @@ and \c{t}.
 
 \begin{lstlisting}
 let rec sub t1 t2 f e =
- match t1,t2,f,e with 
- | (Prim i,Prim j,f,e) -> if i==j then IsSub(f,e) else NotSub
- | (Tuple(a1,a2), Tuple(b1,b2),f,e) ->
-    (match sub a1 b1 f e with
-     | IsSub(f', e') -> sub a2 b2 f' e'
-     | NotSub -> NotSub)
- | (Union(a,_),b,L::f,e) -> sub a b f e
- | (Union(_,a),b,R::f,e) -> sub a b f e
- | (a,Union(b,_),f,L::e) -> sub a b f e
- | (a,Union(_,b),f,R::e) -> sub a b f e
+  match t1,t2,f,e with 
+  | (Prim i,Prim j,f,e) -> if i==j then IsSub(f,e) else NotSub
+  | (Tuple(a1,a2), Tuple(b1,b2),f,e) ->
+     (match sub a1 b1 f e with
+      | IsSub(f', e') -> sub a2 b2 f' e'
+      | NotSub -> NotSub)
+  | (Union(a,_),b,L::f,e) -> sub a b f e
+  | (Union(_,a),b,R::f,e) -> sub a b f e
+  | (a,Union(b,_),f,L::e) -> sub a b f e
+  | (a,Union(_,b),f,R::e) -> sub a b f e
 \end{lstlisting}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -595,7 +605,7 @@ normalization-based subtyping algorithm is correct and complete. Rather than
 directly working with the notion of choice strings as iterators over types,
 we start with a simpler structure, namely that of iterators over the trees
 induced by type terms. We prove correct and complete a subtype algorithm
-that uses these simpler iterators. Finally, we establish a correspondance
+that uses these simpler iterators. Finally, we establish a correspondence 
 between tree iterators and choice list iterators. This concludes our proof
 of correctness and completeness, details can be found in the Coq
 mechanization.
@@ -792,16 +802,16 @@ the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
 Fixpoint sub(a b:Typ)(i:iter a)(i':iter b) :=
-    match (a, b, i, i') with
-    | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
-    | (Tuple a a', Tuple b b', ITuple _ _ ia ia', ITuple _ _ ib ib') =>
+  match (a, b, i, i') with
+  | (Prim(p), Prim(p'), IPrim _, IPrim _) => p == p'
+  | (Tuple a a', Tuple b b', ITuple _ _ ia ia', ITuple _ _ ib ib') =>
         sub a b ia ib && sub a b ia' ib'
-    | (Union a _, b, ILeft _ _ ia)   => sub a b ia i'
-    | (Union _ a, b, IRight _ _ ia)  => sub a b ia i'
-    | (a, Union b _, ia, ILeft _ _ ib)  => sub a b i ib
-    | (a, Union _ b, ia, IRight _ _ ib)  => sub a b i ib
-    | (_, _, _, _) => false
-    end.
+  | (Union a _, b, ILeft _ _ ia)   => sub a b ia i'
+  | (Union _ a, b, IRight _ _ ia)  => sub a b ia i'
+  | (a, Union b _, ia, ILeft _ _ ib)  => sub a b i ib
+  | (a, Union _ b, ia, IRight _ _ ib)  => sub a b i ib
+  | (_, _, _, _) => false
+  end.
 \end{lstlisting}
 
 \noindent

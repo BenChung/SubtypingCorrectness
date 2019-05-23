@@ -10,7 +10,7 @@ jan:
 
 slow:
 	pdflatex main
-	biblatex main
+	bibtex main
 	pdflatex main
 	pdflatex main
 
