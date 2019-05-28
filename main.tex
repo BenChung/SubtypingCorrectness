@@ -801,24 +801,24 @@ specific structure of the type (unlike choice strings), we must break down
 the iterator at every level encountered even if no union is present.
 
 \begin{lstlisting}
-Fixpoint here (t:Typ)(i:iter t):type :=
+Fixpoint here (t:Typ)(i:iter t):Typ :=
   match i with
-  | IPrim i => atom i
+  | IPrim i => Prim i
   | ITuple t1 t2 p1 p2 => Tuple (here t1 p1) (here t2 p2)
   | ILeft t1 t2 pl => (here t1 pl)
   | IRight t1 t2 pr => (here t2 pr)
   end.
 
-Fixpoint ufsub(a b:Typ) :=
-  match (a, b) with
-  | (Prim(p), Prim(p')) => p == p'
+Fixpoint ufsub(t1 t2:Typ) :=
+  match (t1, t2) with
+  | (Prim p, Prim p') => Nat.eqb p p'
   | (Tuple a a', Tuple b b') =>
-        sub a b ia ib && sub a b ia' ib'
-  | (_, _, _, _) => false
+       andb (ufsub a b) (ufsub a' b')
+  | (_, _) => false
   end.
 
 Definition sub (a b:Typ) (ai:iter a) (bi:iter b) :=
-    ufsub (here a ai) (here b bi)
+    ufsub (here a ai) (here b bi).
 \end{lstlisting}
 
 \noindent
