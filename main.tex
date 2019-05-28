@@ -820,9 +820,9 @@ Fixpoint here (t:Typ)(i:iter t):Typ :=
 
 Fixpoint ufsub(t1 t2:Typ) :=
   match (t1, t2) with
-  | (Prim p, Prim p') => Nat.eqb p p'
+  | (Prim p, Prim p') => p == p'
   | (Tuple a a', Tuple b b') =>
-       andb (ufsub a b) (ufsub a' b')
+      ufsub a b && ufsub a' b'
   | (_, _) => false
   end.
 
