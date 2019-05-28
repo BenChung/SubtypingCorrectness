@@ -792,13 +792,22 @@ then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
 holds of every iterator state over $t$.
 \end{theorem} 
 
-\noindent
-Now, one can prove correctness of the subtyping algorithm with tree
-iterators.  A version of \c{sub} which uses tree iterators instead of choice
-strings is required.  This implementation walks type terms and the iterator
-state simultaneously. However, as the tree iterators are linked to the
-specific structure of the type (unlike choice strings), we must break down
-the iterator at every level encountered even if no union is present.
+\noindent Now, one can prove correctness of the subtyping algorithm with tree
+iterators. We implement subtyping with respect to choice lists in the Coq
+implementation by deciding subtyping between the two union-free types induced
+by the iterators over the two  original types, avoiding having to prove
+termination of the combined algorithm. The decision procedure implemented in
+\c{sub} first uses \c{here} on both types and their iterators to pick the
+union-free components of each original type given by their iterators, then
+calls \c{ufsub} to decide union-free subtyping between them. 
+
+This procedure needs two helpers, \c{here} and \c{ufsub}. The function
+\c{here} walks the given iterator, producing a union-free type mirroring its
+state.  To decide subtyping between the resulting union-free types, \c{ufsub}
+checks equality between \c{Prim}s and recurses on the elements of \c{Tuple}s,
+while returning false for all other types. Since \c{here} will never produce a
+union type, the case of \c{ufsub} for them is irrelevant, and is false by
+default.
 
 \begin{lstlisting}
 Fixpoint here (t:Typ)(i:iter t):Typ :=
