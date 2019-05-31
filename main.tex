@@ -288,7 +288,7 @@ that it can be leveraged in other modern language designs.
 Our mechanized proof is available at: {\small\url{benchung.github.io/subtype-artifact}}.
 %\newpage
 
-\section{A Space-efficient Subtyping Algorithm}
+\section{A space-efficient subtyping algorithm}
 
 Let us focus on a core type language consisting of binary unions, binary
 tuples and primitive types ranged over by $p_1 \dots p_n$ where primitive
@@ -583,7 +583,7 @@ let rec sub t1 t2 f e =
 \end{lstlisting}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Further Optimization}
+\subsection{Further optimization}
 
 We have presented an implementation that used lists to represent choice
 strings. It thus required allocation when adding elements to the list and
@@ -844,9 +844,11 @@ order to ensure that recursion is well-founded. The previous version of
 unions were found on either of the sides. In contrast, the proof's version of
 \c{sub} applies the choice list to each side first using \c{here}, a strictly
 decreasing function that recurs structurally on the given type, then checks
-subtyping between the resultant union-free types. We then use \c{sub} as 
-in the original to decide subtyping while iterating over the two choice
-lists.
+subtyping between the resultant union-free types. These implementations are
+equivalent, as they both apply the given choice lists at the same places while
+computing subtyping; however, the proof version separates choice list
+application while the implementation intertwines it with the actual subtyping
+decision.
 
 Versions of \c{exist} and \c{allexist} that use tree iterators are given
 next. They are similar to the string iterator functions of Section~\ref{cs}.
@@ -931,7 +933,7 @@ iterators simulate tree iterators.  To relate tree iterators to choice
 string iterators, we use the \c{itp} function, which traverses a tree
 iterator state and produces a choice string using a depth-first search.
 
-
+\newpage
 \begin{lstlisting}
 Fixpoint itp{t:Typ}(it:iter t):choice list :=
    match it with
