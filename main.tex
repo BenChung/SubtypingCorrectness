@@ -809,6 +809,8 @@ while returning false for all other types. Since \c{here} will never produce a
 union type, the case of \c{ufsub} for them is irrelevant, and is false by
 default.
 
+\medskip
+
 \noindent
 \begin{minipage}{0.53\textwidth}
 \begin{lstlisting}
@@ -834,6 +836,8 @@ Fixpoint ufsub(t1 t2:Typ) :=
 %
 \end{lstlisting}
 \end{minipage}
+
+\newpage
 \begin{lstlisting}
 Definition sub (a b:Typ) (ai:iter a) (bi:iter b) :=
     ufsub (here a ai) (here b bi).
@@ -934,7 +938,7 @@ iterators simulate tree iterators.  To relate tree iterators to choice
 string iterators, we use the \c{itp} function, which traverses a tree
 iterator state and produces a choice string using a depth-first search.
 
-\newpage
+
 \begin{lstlisting}
 Fixpoint itp{t:Typ}(it:iter t):choice list :=
    match it with
