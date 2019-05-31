@@ -795,7 +795,7 @@ holds of every iterator state over $t$.
 \noindent Now, one can prove correctness of the subtyping algorithm with tree
 iterators. We implement subtyping with respect to choice lists in the Coq
 implementation by deciding subtyping between the two union-free types induced
-by the iterators over the two  original types, avoiding having to prove
+by the iterators over the two original types, avoiding having to prove
 termination of the combined algorithm. The decision procedure implemented in
 \c{sub} first uses \c{here} on both types and their iterators to pick the
 union-free components of each original type given by their iterators, then
@@ -809,15 +809,21 @@ while returning false for all other types. Since \c{here} will never produce a
 union type, the case of \c{ufsub} for them is irrelevant, and is false by
 default.
 
+\noindent
+\begin{minipage}{0.53\textwidth}
 \begin{lstlisting}
-Fixpoint here (t:Typ)(i:iter t):Typ :=
+Fixpoint here(t:Typ)(i:iter t):Typ:=
   match i with
   | IPrim i => Prim i
-  | ITuple t1 t2 p1 p2 => Tuple (here t1 p1) (here t2 p2)
+  | ITuple t1 t2 p1 p2 => 
+    Tuple (here t1 p1) (here t2 p2)
   | ILeft t1 t2 pl => (here t1 pl)
   | IRight t1 t2 pr => (here t2 pr)
   end.
-
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.47\textwidth}
+\begin{lstlisting}
 Fixpoint ufsub(t1 t2:Typ) :=
   match (t1, t2) with
   | (Prim p, Prim p') => p == p'
@@ -825,10 +831,20 @@ Fixpoint ufsub(t1 t2:Typ) :=
       ufsub a b && ufsub a' b'
   | (_, _) => false
   end.
-
+\end{lstlisting}
+\end{minipage}
+\begin{lstlisting}
 Definition sub (a b:Typ) (ai:iter a) (bi:iter b) :=
     ufsub (here a ai) (here b bi).
 \end{lstlisting}
+
+\noindent This procedure differs from that used in the earlier version in
+order to ensure that recursion is well-founded. The previous version of
+\c{sub} was, in the case of unions, decreasing on alternating arguments  when
+unions were found on either of the sides. In contrast, the proof's version of
+\c{sub} applies the choice list to each side first using \c{here}, a strictly
+decreasing function that recurs structurally on the given type, then checks
+subtyping between the resultant union-free types.
 
 \noindent
 Versions of \c{exist} and \c{allexist} that use tree iterators are given
