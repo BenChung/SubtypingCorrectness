@@ -844,9 +844,10 @@ order to ensure that recursion is well-founded. The previous version of
 unions were found on either of the sides. In contrast, the proof's version of
 \c{sub} applies the choice list to each side first using \c{here}, a strictly
 decreasing function that recurs structurally on the given type, then checks
-subtyping between the resultant union-free types.
+subtyping between the resultant union-free types. We then use \c{sub} as 
+in the original to decide subtyping while iterating over the two choice
+lists.
 
-\noindent
 Versions of \c{exist} and \c{allexist} that use tree iterators are given
 next. They are similar to the string iterator functions of Section~\ref{cs}.
 \c{exist} tests if the subtyping relation holds in the context of the
