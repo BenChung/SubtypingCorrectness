@@ -800,7 +800,6 @@ termination of the combined algorithm. The decision procedure implemented in
 \c{sub} first uses \c{here} on both types and their iterators to pick the
 union-free components of each original type given by their iterators, then
 calls \c{ufsub} to decide union-free subtyping between them. 
-
 This procedure needs two helpers, \c{here} and \c{ufsub}. The function
 \c{here} walks the given iterator, producing a union-free type mirroring its
 state.  To decide subtyping between the resulting union-free types, \c{ufsub}
@@ -837,7 +836,7 @@ Fixpoint ufsub(t1 t2:Typ) :=
 \end{lstlisting}
 \end{minipage}
 
-\newpage
+
 \begin{lstlisting}
 Definition sub (a b:Typ) (ai:iter a) (bi:iter b) :=
     ufsub (here a ai) (here b bi).
@@ -977,7 +976,7 @@ $\c{next}~\mathit{it}=\mathit{it}'$, then $\c{next} (\c{itp}\;\mathit{it}) =
 (\c{itp}\;\mathit{it'})$.
 \end{lemma}
 \noindent
-Finally, the initial state of a tree iterator linearizes to the
+The initial state of a tree iterator linearizes to the
 initial state of a choice string iterator.
 
 \begin{lemma}[Initial Equivalence]\label{eqinit}
@@ -1001,6 +1000,7 @@ $\c{exist}~a~b~(\c{itp}~i_a) (\c{itp}~i_b)$ holds iff $\exists t \in
   \irch{i_b}{b}, a(ia)=t$.
 \end{lemma}
 
+\noindent
 With the correctness of \c{exist} following from the tree iterator definition,
 we can apply the same proof methodology to show that \c{allexist} is correct
 when over translated tree iterators. In order to do so, we instantiate
