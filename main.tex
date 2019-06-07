@@ -67,18 +67,15 @@
   The Julia programming language supports multiple dispatch and provides a
   rich type annotation language to specify method applicability. When
   multiple methods are applicable for a given call, Julia relies on
-  subtyping between method signatures to pick the invoked method. Julia's
+  subtyping between method signatures to pick the correct method to invoke. Julia's
   subtyping algorithm is surprisingly complex, and deciding whether it is
   correct remains an open question. In this paper, we focus on one piece of
   this problem: the interaction between union types and covariant
   tuples. Previous work that addressed this particular combination of
   features did so by normalizing types to a disjunctive normal form
-  ahead-of-time. However, normalization is not practical due to
-  complex type signature space-explosion and interactions with other features of Julia's
-  type system.  Our contribution is a description of the algorithm
-  implemented in the Julia run-time system, immune to these issues of space-explosion and expressiveness.  We
-  prove this algorithm correct and complete against a semantic-subtyping
-  denotational model in Coq.
+  ahead-of-time. However, normalization-based algorithms suffer from two problems: complex type signatures induce space explosion, and their interactions with other features of Julia’s type system render them incorrect. In this paper, we describe the algorithm that Julia
+  uses to compute subtyping between tuples and unions---an algorithm that is immune to these issues of space explosion
+  and expressiveness.  We prove this algorithm correct and complete against a semantic-subtyping denotational model in Coq.
 \end{abstract}
 
 \section{Introduction}
@@ -87,12 +84,13 @@ Union types, originally introduced by Barbanera and
 Dezani-Ciancaglini~\cite{barbanera1991intersection}, are increasingly being
 used in mainstream languages. In some cases, such as Julia~\cite{BezansonEKS17}
 or TypeScript~\cite{typescript}, they are exposed at the source level. In
-others, such as Hack~\cite{hack}, they are only used internally for
-type inference. As a result, subtyping between union types is of increasing
+others, such as Hack~\cite{hack}, they are only used as part of
+type inference. As a result of this increasing use of union types both as
+expressibility aids and for type inference, subtyping between union types is of increasing
 practical import.
 
 We describe a space-efficient technique for computing subtyping between types
-in the presence of distributive unions, arising from the Julia programming
+that contain distributive unions, arising from the Julia programming
 language. In our previous work on formalizing the Julia subtyping
 algorithm~\cite{DBLP:NardelliBPCBV18}, we described the subtyping relation but
 were unable to describe the subtyping algorithm or prove it correct. Indeed,
@@ -101,7 +99,7 @@ we found bugs and were left with unresolved issues.
 Julia's subtyping algorithm~\cite{bezansonthesis} is an important part of its semantics. Julia is
 a dynamically typed language where methods are annotated with type
 signatures to enable multiple dispatch. During program execution, Julia must
-determine which method to invoke at each call site; it searches for
+determine which method to invoke at each call site. It searches for
 the most specific (according to subtyping) applicable method that applies
 for a given invocation. 
 For example, the following snippet shows three declarations of
@@ -117,29 +115,35 @@ multiplication:
 range is multiplied by a number and generic numeric multiplication. The
 third method invokes native multiplication when both arguments are either
 signed or unsigned integers (but not a mix of the two). Julia will use subtyping
-to decide which of the methods will be invoked for any specific invocation; the call
+to decide which of the methods will be used for any specific invocation. The call
 \c{1*(1:4)} will be dispatched to the first, \c{1*1.1} the second, and \c{1*1} the third.
 
 Julia offers programmers a rich type language to allow type signatures to
 express complex relationships.  Julia's types include nominal single
 subtyping, union types, existential types, covariant tuples, invariant
 parametric datatypes, and singletons. These types are all widely used in
-libraries, but subtyping between them poses substantial challenges, challenges
-that arise  due to Julia's semantic subtyping inpsired
-design~\cite{BezansonEKS17}. Subtyping in Julia follows the semantic intuition
----that subtyping between two types should be equivalent to  their denoted
-sets of values being subsets of one another---a property that is difficult to
-establish algorithmically for a type language as rich as Julia's.
+libraries, but subtyping between them poses substantial challenges. Subtyping
+in Julia is difficult due to its design, whose intuition arises primarily from
+semantic subtyping~\cite{BezansonEKS17}. Subtyping in Julia follows the semantic intuition:
+subtyping between two types should be equivalent to  their denoted
+sets of values being subsets of one another. This property is difficult to
+establish algorithmically, especially for a type language as rich as Julia's.
+
+In this paper, we will focus on the interaction of two features: covariant
+tuples and union types. These two kinds of type are very important to Julia's
+semantics, as both factor heavily into method dispatch. Julia does not record
+function return types, so function types in Julia are only the tuple of their
+argument types. These tuples are covariant, as a function with more specific
+arguments (a property decided using subtyping) is preferred to a more generic
+one. Union types are widely used as shorthand to avoid writing multiple
+functions with the same body. As a consequence, Julia library developers write
+many functions with union typed arguments, functions whose relative
+specificity must be decided using subtyping.
 
 This paper documents the first steps towards proving the correctness of
-Julia's subtyping algorithm. We focus on the interaction of two features:
-covariant tuples and union types. Tuples are used to represent function
-signatures, as Julia does not record return types. They are covariant, as a
-function with more specific arguments is preferred to a more generic one.
-Union types are used as shorthand to avoid writing multiple
-functions with the same body.  Rules for subtyping union types and covariant
-tuples have been known for a long time. Based on Vouillon~\cite{Vouillon04},
-the following is a typical deductive system:
+Julia's subtyping algorithm. To do so, we will first examine typical approaches
+to decide subtyping in the presence of union types. Based on Vouillon~\cite{Vouillon04},
+the following is a typical deductive system for subtyping union types:
 
 \vspace{-4mm}{\small\begin{mathpar}
 \inferrule[allexist]{
