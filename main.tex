@@ -96,14 +96,14 @@ algorithm~\cite{DBLP:NardelliBPCBV18}, we described the subtyping relation but
 were unable to describe the subtyping algorithm or prove it correct. Indeed,
 we found bugs and were left with unresolved issues.
 
-Julia's subtyping algorithm~\cite{bezansonthesis} is an important part of its semantics. Julia is
-a dynamically typed language where methods are annotated with type
-signatures to enable multiple dispatch. During program execution, Julia must
-determine which method to invoke at each call site. It searches for
-the most specific (according to subtyping) applicable method that applies
-for a given invocation. 
-For example, the following snippet shows three declarations of
-multiplication:
+Julia's subtyping algorithm~\cite{bezansonthesis} is an important part of its
+semantics, as subtyping is used extensively as part of Julia's dispatch
+mechanism. While Julia is a dynamically typed language, methods can have
+explicitly typed signatures enabling multiple dispatch. During program
+execution, Julia must determine which method to invoke at each call site. It
+searches for the most specific (according to subtyping) applicable method that
+applies for a given invocation.  For example, the following snippet shows
+three declarations of multiplication:
 
 \begin{lstlisting}
  *(x::Number, r::Range)  = range(x*first(r),...)
@@ -119,7 +119,7 @@ to decide which of the methods will be used for any specific invocation. The cal
 \c{1*(1:4)} will be dispatched to the first, \c{1*1.1} the second, and \c{1*1} the third.
 
 Julia offers programmers a rich type language to allow type signatures to
-express complex relationships.  Julia's types include nominal single
+express complex relationships. The Julia type language includes nominal single
 subtyping, union types, existential types, covariant tuples, invariant
 parametric datatypes, and singletons. These types are all widely used in
 libraries, but subtyping between them poses substantial challenges. Subtyping
@@ -134,7 +134,7 @@ subtyping to the sets of values which they represent~\cite{Pierce1991}. Two
 types are subtypes if the sets of values that they denote are subsets. If we
 write the set of values represented by a type $t$ as {\small $\denotes{t}$},
 then the types $t_1$ and $t_2$ are subtypes iff {\small $\denotes{t_1}
-\subseteq \denotes{t_2}$}. From this we derive an \emph{forall-exists}
+\subseteq \denotes{t_2}$}. From this we derive a \emph{forall-exists}
 intuition for subtyping: for every value denoted on the left-hand-side, there
 must exist some value on the right hand side to match it, thereby establishing
 the subset relation. This simple intuition can, however, be complicated to
@@ -168,7 +168,7 @@ the following is a typical deductive system for subtyping union types:
 \end{mathpar}}
 \vspace{-4mm}
 
-\noindent While this rule system might seems to make intuitive sense, it does
+\noindent While this rule system might seem to make intuitive sense, it does
 not match the semantic intuition for subtyping. While it attempts to express
 the same forall-exists relation that arises from the semantic intuition, it is
 possible to construct judgments where forall-exists and this rule system
@@ -283,12 +283,12 @@ assumption that {\small$\union{t}{t'} <: T$}.
 The key to deriving a successful judgment for this relation is to rewrite the
 right-to-left check into {\small$\tuple{T}<:\tuple{\union{t}{t'}}$}, which is
 provable. This \emph{anti-normalization} rewriting must be performed on
-sub-judgments of the derivation, and to the best of our knowledge it is not
+sub-judgments of the derivation; to the best of our knowledge it is not
 part of any subtype algorithm based on ahead-of-time disjunctive
 normalization. As a result, straightforward normalization, even to a relaxed
 normal form, is incompatible with the full Julia type system.
 
-Julia's subtyping algorithm avoids these problems but it is difficult to
+Julia's subtyping algorithm avoids these problems, but it is difficult to
 determine how: the complete Julia subtype algorithm is implemented in close to
 two thousand lines of highly optimized C code. In this paper, we describe and
 prove correct only one part of that algorithm: the technique used to avoid
@@ -388,7 +388,7 @@ let rec norm = function
   | Union t t' -> (normalize t) @ (normalize t')
 \end{lstlisting}
 
-However, as previously described this expansion is space-inefficient. Julia's
+However, as previously described, this expansion is space-inefficient. Julia's
 algorithm is more complicated, but avoids having to pre-compute the set of normalized
 types as \c{norm} does. 
 
@@ -465,7 +465,7 @@ padded by a sequence of \Ls. The leftover {\R}s $c''$ are discarded. If there is
 no \L in $c$, iteration terminates.
 
 One step of iteration is performed by calling the \c{next} function with a
-type term and a choice string. \c{next} either returns the next string in
+type term and a choice string (encoded as a \c{list} of \c{choice}s). \c{next} either returns the next string in
 the sequence or \c{None}. Internally, it calls \c{step} to toggle the
 last \L and shorten the string (constructing $c'\,\R$). Then it call on
 \c{pad} to add the trailing sequence of \Ls (constructing $c'\,\R\,c_{pad}$).
@@ -612,31 +612,33 @@ let rec sub t1 t2 f e =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Further optimization}
 
-We have presented an implementation that uses lists to represent choice
-strings. It thus requires allocation when adding elements to the list and
-for reversing the list. In Julia, choice strings are represented by bit
-vectors of size bounded by the number of unions in each type term.  Once
-that size is known and the bit vector is created, no further allocation is
-required.
+This implementation represents choice strings as linked lists, but this design
+requires allocation and reversals when stepping. However, the implementation
+can be made more efficient by using a mutable bit vector instead of a linked
+list. Additionally, the maximum length of the bit vector is bounded by the
+number of unions in the type, so it need only be allocated once. Julia's
+implementation uses this efficient representation.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Correctness and Completeness of Subtyping}
+\section{Correctness and completeness of subtyping}
 
-To prove the correctness of Julia's subtyping we take the following general
+To prove the correctness of Julia's subtyping, we take the following general
 approach. We start by giving a denotational semantics for types from which
 we derive a definition of semantic subtyping. Then we easily prove that a
 normalization-based subtyping algorithm is correct and complete. This provides
-the general framework for which we will prove the iterator-based algorithms correct.
+the general framework for which we will prove two iterator-based algorithms correct.
+The first iterator-based algorithm explicitly includes the structure of the type in
+its state to guide iteration; the second is identical to that of the prior section.
 
-The order in which choice lists iterate through a type term is determined by
-both the choice list and the type term being iterated over. Rather than
-directly working with the notion of choice strings as iterators over types,
+The order in which choice strings iterate through a type term is determined by
+both the choice string and the type term being iterated over. Rather than
+directly working with choice strings as iterators over types,
 we start with a simpler structure, namely that of iterators over the trees
 induced by type terms. We prove correct and complete a subtype algorithm
 that uses these simpler iterators. Finally, we establish a correspondence 
-between tree iterators and choice list iterators. This concludes our proof
+between tree iterators and choice string iterators. This concludes our proof
 of correctness and completeness, details can be found in the Coq
 mechanization.
 
@@ -655,7 +657,7 @@ We define subtyping as follows, if $\denotes{t}\subseteq\denotes{t'}$, then
 $t<:t'$.  This leads to the definition of subtyping in our restricted language.
 
 \begin{definition}
-The subtyping relation $t_1 <: t_2$ holds iff $\forall t_1' \in
+ The subtyping relation $t_1 <: t_2$ holds iff $\forall t_1' \in
 \denotes{t_1}, \exists\, t_2' \in \denotes{t_2}, t_1' =
 t_2'$.\label{dfn:scr}
 \end{definition}
@@ -686,7 +688,7 @@ For all  a and b, \c{subtype} a b iff $a <: b$.
 \end{theorem}
 
 \noindent
-Therefore, normalization based subtyping is correct against our definition.
+Therefore, normalization-based subtyping is correct against our definition.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -696,12 +698,12 @@ Reasoning about iterators that use choice strings, as described in
 Section~\ref{cs}, is tricky as it requires simultaneously reasoning about
 the structure of the type term and the validity of the choice string that
 represents the iterator's state. Instead, we propose to use an intermediate
-data structure called a tree iterator to tie the two together and thus makes
-reasoning simpler.
+data structure, called a tree iterator, to guarantee consistency of iterator
+state with type structure.
 
 A tree iterator is a representation of the iteration state embedded in a type
 term. Thus a tree iterator yields a union-free tuple and can either step to a
-successor state or is a final state. Recalling the graphical notation of
+successor state or a final state. Recalling the graphical notation of
 Section~\ref{cs}, we can represent the state of iteration as a combination of
 type term and a choice or, equivalently, as a tree iterator.
 
@@ -735,15 +737,16 @@ Inductive iter: Typ -> Set :=
 \end{lstlisting}
 
 \noindent
-The \c{next} function for tree iterators steps in a depth-first,
-right-to-left order.  We have four cases to worry about. For a primitive
-type, there is no successor state. A tuple steps its second child; if that
+The \c{next} function for tree iterators steps in depth-first,
+right-to-left order. There are four cases to worry about:
+\begin{itemize}
+  \item A primitive has no successor.
+  \item A tuple steps its second child; if that
 has no successor step, then it steps its first child and reset the second
-child. When given a \c{ILeft} or an \c{IRight} it tries to step its only
-child. If the child has no successor, an \c{ILeft} steps to an \c{IRight}
-and its child is set to the right child of the corresponding node in the
-type term. A \c{IRight} whose child has no successor state will also have
-no successor.
+child.
+  \item An \c{ILeft} will try to step its child. If it has no successor, then the \c{ILeft} will become an \c{IRight} with a newly-initalized child corresponding to the right child of the union.
+  \item An \c{IRight} will also try to step its child, but will be final if its child has no successor.
+  \end{itemize}
 
 \begin{lstlisting}
 Fixpoint next(t:Typ)(i:iter t): option(iter t) := match i with
@@ -776,10 +779,10 @@ Fixpoint next(t:Typ)(i:iter t): option(iter t) := match i with
 \noindent
 An induction principle for tree iterators is needed to reason about all
 iterator states for a given type. First, we show that iterators eventually
-reach a final state. This is done with function \c{inum} that assigns
+reach a final state. This is done with a function \c{inum}, which assigns
 natural numbers to each state. It simply counts the number of remaining
-steps in the iterator, using \c{tnum} to count the total number of
-union-free types denoted by some type \c{t} as a helper.
+steps in the iterator. To count the total number of union-free types 
+denoted by a type, it will use the \c{tnum} helper function.
 
 \begin{lstlisting}
 Fixpoint tnum(t:Typ):nat :=
@@ -792,8 +795,8 @@ Fixpoint tnum(t:Typ):nat :=
 Fixpoint inum(t:Typ)(ti:iter t):nat :=
   match ti with
   | IPrim i => 0
-  | ITuple t1 t2 i1 i2 => inum t1 i1 * total_num t2 + inum t2 i2
-  | IUnionL t1 t2 i1 => inum t1 i1 + total_num t2
+  | ITuple t1 t2 i1 i2 => inum t1 i1 * tnum t2 + inum t2 i2
+  | IUnionL t1 t2 i1 => inum t1 i1 + tnum t2
   | IUnionR t1 t2 i2 => inum t2 i2
   end.
 \end{lstlisting}
@@ -809,32 +812,28 @@ If $\c{next}~t~it = it'$ then $\c{inum}~t~it = 1 + \c{inum}~t~it'$.
 
 \noindent
 It is now possible to define an induction principle over \c{next}. By
-monotonicy, \c{next} eventually reaches a final state.  For any property
-of interest, if we prove that it holds of the final state and for the
+monotonicity, \c{next} eventually reaches a final state.  For any property
+of interest, if we prove that it holds for the final state and for the
 induction step, we can prove it holds for every state for that type.
 
 \begin{theorem}[Tree Iterator Induction]\label{indprop}
 Let $P$ be any property of tree iterators for some type $t$.  Suppose $P$
-holds of the final state, and whenever $P$ holds of a successor state $it$
-then it holds of its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
-holds of every iterator state over $t$.
+holds for the final state, and whenever $P$ holds for a successor state $it$
+then it holds for its precursor $it'$ where $\c{next}~t~it' = it$.  Then $P$
+holds for every iterator state over $t$.
 \end{theorem} 
 
-\noindent Now, one can prove correctness of the subtyping algorithm with tree
-iterators. We implement subtyping with respect to choice lists in the Coq
-implementation by deciding subtyping between the two union-free types induced
-by the iterators over the two original types, avoiding having to prove
-termination of the combined algorithm. The decision procedure implemented in
-\c{sub} first uses \c{here} on both types and their iterators to pick the
-union-free components of each original type given by their iterators, then
-calls \c{ufsub} to decide union-free subtyping between them. 
-This procedure needs two helpers, \c{here} and \c{ufsub}. The function
+\noindent Now, we can prove correctness of the subtyping algorithm with tree
+iterators. We implement subtyping with respect to choice strings in the Coq
+implementation in a two-stage process. First, we compute the union-free types
+induced by the iterators over their original types using \c{here}. Second, we
+decide subtyping between the two union-free types in \c{ufsub}. The function
 \c{here} walks the given iterator, producing a union-free type mirroring its
 state.  To decide subtyping between the resulting union-free types, \c{ufsub}
-checks equality between \c{Prim}s and recurses on the elements of \c{Tuple}s,
-while returning false for all other types. Since \c{here} will never produce a
-union type, the case of \c{ufsub} for them is irrelevant, and is false by
-default.
+checks equality between \c{Prim}\hspace{-0.3em}s and recurses on the elements
+of \c{Tuple}\hspace{-0.3em}s, while returning false for all other types. Since
+\c{here} will never produce a union type, the case of \c{ufsub} for them is
+irrelevant, and is false by default.
 
 \medskip
 
@@ -870,25 +869,26 @@ Definition sub (a b:Typ) (ai:iter a) (bi:iter b) :=
     ufsub (here a ai) (here b bi).
 \end{lstlisting}
 
-\noindent This procedure differs from that used in the earlier version in
-order to ensure that recursion is well-founded. The previous version of
-\c{sub} was, in the case of unions, decreasing on alternating arguments  when
-unions were found on either of the sides. In contrast, the proof's version of
-\c{sub} applies the choice list to each side first using \c{here}, a strictly
-decreasing function that recurs structurally on the given type, then checks
-subtyping between the resultant union-free types. These implementations are
-equivalent, as they both apply the given choice lists at the same places while
-computing subtyping; however, the proof version separates choice list
-application while the implementation intertwines it with the actual subtyping
-decision.
+\noindent This procedure differs from that used in the earlier version  to
+ensure that recursion is well founded. The previous version of \c{sub} was, in
+the case of unions, decreasing on alternating arguments  when unions were
+found on either of the sides. In contrast, the proof's version of \c{sub}
+applies the choice string to each side first using \c{here}, a strictly
+decreasing function that recurs structurally on the given type. This computes
+the union-free type induced by the iterator applied to the current (unionful)
+type. The algorithm then checks subtyping between the resultant union-free
+types, which is entirely structural. These implementations are equivalent, as
+they both apply the given choice strings at the same places while computing
+subtyping; however, the proof version separates choice string application
+while the implementation intertwines it with the actual subtyping decision.
 
 Versions of \c{exist} and \c{allexist} that use tree iterators are given
 next. They are similar to the string iterator functions of Section~\ref{cs}.
 \c{exist} tests if the subtyping relation holds in the context of the
 current iterator states for both sides. If not, it recurs on the next
 state. Similarly, \c{allexist} uses its iterator for $a$ in conjunction with
-\c{exist} to ensure that the current left hand iterator state has a matching
-right hand state. We prove termination of both using Lemma~\ref{inum_mono}.
+\c{exist} to ensure that the current left-hand iterator state has a matching
+right-hand state. We prove termination of both using Lemma~\ref{inum_mono}.
 
 \begin{lstlisting}
 Definition subtype(a b:Typ) = allexist a b (initial a)
@@ -960,10 +960,11 @@ $\c{subtype}\;a\;b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Subtyping with Choice Strings}
 
-We prove the subtyping algorithm using choice strings by showing that string
-iterators simulate tree iterators.  To relate tree iterators to choice
-string iterators, we use the \c{itp} function, which traverses a tree
-iterator state and produces a choice string using a depth-first search.
+We prove the subtyping algorithm correct and complete using choice strings by
+showing that string iterators simulate tree iterators.  To relate tree
+iterators to choice string iterators, we use the \c{itp} function, which
+traverses a tree iterator state and linearizes it, producing a choice string
+using depth-first search.
 
 
 \begin{lstlisting}
@@ -976,13 +977,12 @@ Fixpoint itp{t:Typ}(it:iter t):choice list :=
    end.
 \end{lstlisting}
 
-\noindent
-Next, in order to show that the choice string iteration order is exhibited
-when linearizing tree iterators into choice strings.  The \c{next} function
-in Section~\ref{cs} worked by finding the last \L in the choice string,
-turning it into an \R, and replacing the rest with \Ls until the type was
-valid. If we use \c{itp} to translate both the initial and final states for a valid
-\c{next} step of a tree iterator, we see the same structure.
+\noindent Next, we define an induction principle over choice strings by way of
+linearized tree iterators. The \c{next} function in Section~\ref{cs} works by
+finding the last \L in the choice string, turning it into an \R, and replacing
+the rest with \Ls until the type is valid. If we use \c{itp} to translate
+both the initial and final states for a valid \c{next} step of a tree
+iterator, we see the same structure.
 
 \begin{lemma}[Linearized Iteration]
 \label{lem:snt}
@@ -1015,11 +1015,11 @@ $\c{itp} (\c{initial}\;t) = \c{pad}\;t\;\c{[]}$.
 The functions \verb|exist| and \verb|allexist| for choice string based
 iterators are identical to those for tree iterators (though using choice
 string iterators internally), and \verb|sub| is as described in
-Section~\ref{cs}. The proofs of correctness for the choice string subtype
+Section~\ref{cs}. The correctness proofs for the choice string subtype
 decision functions use the tree iterator induction principle
 (Theorem~\ref{indprop}), and are thus in terms of tree iterators. By
 Lemma~\ref{sctxcorr}, however, each step that the tree iterator takes will be
-mirrored precisely \c{itp} into choice strings. Similarly, the initial states
+mirrored precisely by \c{itp} into choice strings. Similarly, the initial states
 are identical by Lemma~\ref{eqinit}. As a result, the sequence of states
 checked by each of the iterators is equivalent with \c{itp}.
 
@@ -1028,14 +1028,13 @@ $\c{exist}~a~b~(\c{itp}~i_a) (\c{itp}~i_b)$ holds iff $\exists t \in
   \irch{i_b}{b}, a(ia)=t$.
 \end{lemma}
 
-\noindent
-With the correctness of \c{exist} following from the tree iterator definition,
-we can apply the same proof methodology to show that \c{allexist} is correct
-when over translated tree iterators. In order to do so, we instantiate
-Lemma~\ref{cstrec}  with Lemma~\ref{triter_eq} and Lemma~\ref{eqinit} to show
-that if $\c{exist}\;\c a\;\c b\;(\c{itp}\;\c{ia})\;(\c{pad}\;\c t\;\c{[]})$
-then $\exists \c t \in \denotes{\c b}, \c a(\c{ia}) = \c t$, allowing us to check 
-each of the exists cases while establishing the forall-exists relationship.
+\noindent With the correctness of \c{exist} following from the tree iterator
+definition, we can apply the same proof methodology to show that \c{allexist}
+is correct. In order to do so, we instantiate Lemma~\ref{cstrec}  with
+Lemma~\ref{triter_eq} and Lemma~\ref{eqinit} to show that if $\c{exist}\;\c
+a\;\c b\;(\c{itp}\;\c{ia})\;(\c{pad}\;\c t\;\c{[]})$ then $\exists \c t \in
+\denotes{\c b}, \c a(\c{ia}) = \c t$, allowing us to check  each of the exists
+cases while establishing the forall-exists relationship.
 
 \begin{lemma}\label{cstraec}
 $\c{allexist}~a~b (\c{itp}~i_a)$
@@ -1061,26 +1060,26 @@ $\c{subtype}~a~b$ holds iff $\forall a'\in\denotes{a}, \exists
 
 \noindent
 Thus, we can correctly decide subtyping with distributive unions and tuples
-using the choice list based implementation of iterators.
+using the choice string based implementation of iterators.
 
 \section{Complexity}
 
-Worst case time complexity of Julia's subtyping algorithm and
+The worst-case time complexity of Julia's subtyping algorithm and
 normalization-based approaches is determined by the number of terms that
-would exist in the normalized type. In the worst case, there are $2^n$
+could exist in the normalized type. In the worst case, there are $2^n$
 union-free tuples in the fully normalized version of a type that has $n$
-unions.  Each of these tuples must always be explored. As a result, both
+unions.  Each of those tuples must always be explored. As a result, both
 algorithms have worst-case $O(2^n)$ time complexity. The approaches differ,
 however, in space complexity. The normalization approach computes and stores
-each of the exponentially many alternatives, so also has $O(2^n)$ space
+each of the exponentially many alternatives, so it also has $O(2^n)$ space
 complexity. However, Julia need only store the choice made at each union,
 thereby offering $O(n)$ space complexity.
 
 Julia's algorithm improves best-case time performance.  Normalization always
-experiences worst case time and space behavior as it has to precompute the
+experiences worst-case time and space behavior as it has to precompute the
 entire normalized type. Julia's iteration-based algorithm can discover the
 relation between types early. In practice, many queries are of the form
-$\mathit{uft} <: union(t_1...t_n)$ where $\mathit{uft}$ is an already
+$\mathit{uft} <: union(t_1...t_n)$, where $\mathit{uft}$ is an already
 union-free tuple. As a result, all that Julia needs to do is find one matching
 tuple in $t_1 ... t_n$, which could be handled quickly by a fast path.
 
@@ -1093,7 +1092,7 @@ semantics for union over tuples.
 
 Future work is to handle some additional features of the Julia language.
 Our next steps will be subtyping for primitive tpyes, existential type
-variables, and invariant constructors.  Adding a subtyping to primitive
+variables, and invariant constructors.  Adding subtyping to primitive
 types would be the simplest change. The challenge is how to retain
 completeness, as a primitive subtype heirarchy and semantic subtyping have
 undesirable interactions.  For example, if the primitive subtype hierarchy
@@ -1108,19 +1107,20 @@ compares types to type variables. As a result, correctness becomes a much
 more complex contextually-linked property to prove.  Finally, invariant type
 constructors induce contravariant subtyping, which in the context of
 existential type variables has the potential to create cycles within the
-subtyping relation. As a consequence, the termination of our algorithm comes
+subtyping relation. As a consequence, the termination of the algorithm comes
 into question even if the language is otherwise limited to avoid provable
 non-termination.
 
 \medskip
 
-\subsubsection*{Acknowledgments}
-The authors thank Jiahao Chen for starting us down the path of understanding
-Julia, and Jeff Bezanson for coming up with Julia's subtyping algorithm.  This
+\subsubsection*{Acknowledgments} The authors thank Jiahao Chen for starting us
+down the path of understanding Julia, and Jeff Bezanson for coming up with
+Julia's subtyping algorithm. We would  also like to thank Ming-Ho Yee, Celeste
+Hollenbeck, and Julia Belyakova for their help in preparing this paper. This
 work received funding from the European Research Council under the European
 Union's Horizon 2020 research and innovation programme (grant agreement
-695412), the NSF (award 1544542 and award 1518844), the ONR (grant 503353), and the Czech Ministry of
-Education, Youth and Sports (grant agreement
+695412), the NSF (award 1544542 and award 1518844), the ONR (grant 503353),
+and the Czech Ministry of Education, Youth and Sports (grant agreement
 CZ.02.1.01/0.0/0.0/15\_003/0000421).
  
 
