@@ -9,16 +9,9 @@
  author = {Muehlboeck, Fabian and Tate, Ross},
  title = {Empowering Union and Intersection Types with Integrated Subtyping},
  journal = {Proc. ACM Program. Lang.},
- issue_date = {November 2018},
  volume = {2},
  number = {OOPSLA},
  year = {2018},
- issn = {2475-1421},
- articleno = {112},
- doi = {10.1145/3276482},
- acmid = {3276482},
- publisher = {ACM},
- keywords = {decidability, distributivity, extensibility, intersections, subtyping, unions},
 } 
 
 @Inbook{Reynolds1997,
@@ -47,6 +40,7 @@ doi="10.1007/978-1-4612-4118-8_9"
   booktitle = {Computer Science Logic {(CSL)}},
   year      = {2004},
   doi       = {10.1007/978-3-540-30124-0_32},
+  url = {https://www.cis.upenn.edu/~bcpierce/papers/uipq.ps}
 }
 
 @article{BezansonEKS17,
@@ -74,22 +68,18 @@ doi="10.1007/978-1-4612-4118-8_9"
 
 @article{DBLP:NardelliBPCBV18,
  author = {Zappa Nardelli, Francesco and Belyakova, Julia and Pelenitsyn, Artem and Chung, Benjamin and Bezanson, Jeff and Vitek, Jan},
- title = {Julia Subtyping: A Rational Reconstruction},
+ title = {Julia subtyping: a rational reconstruction},
  journal = {Proc. ACM Program. Lang.},
- issue_date = {November 2018},
  volume = {2},
  number = {OOPSLA},
  year = {2018},
- issn = {2475-1421},
- articleno = {113},
  doi = {10.1145/3276483},
- acmid = {3276483},
  publisher = {ACM},
  keywords = {Multiple Dispatch, Subtyping},
 } 
 
 @misc{typescript,
-  title={Typescript Language Specification},
+  title="Typescript Language Specification",
   url={https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md},
   publisher={Microsoft}
 }
@@ -103,7 +93,7 @@ doi="10.1007/978-1-4612-4118-8_9"
 @inproceedings{barbanera1991intersection,
   title={Intersection and union types},
   author={Barbanera, Franco and Dezani-Ciancaglini, Mariangiola},
-  booktitle={International Symposium on Theoretical Aspects of Computer Software},
+  booktitle={Theoretical Aspects of Computer Software {TACS}},
   year={1991},
   doi={10.1007/3-540-54415-1_69}
 }
@@ -111,7 +101,7 @@ doi="10.1007/978-1-4612-4118-8_9"
 @inproceedings{aiken1991implementing,author="Aiken, Alexander
 and Murphy, Brian R.",
 title="Implementing regular tree expressions",
-booktitle="Functional Programming Languages and Computer Architecture",
+booktitle="Functional Programming Languages and Computer Architecture {FPCA}",
 year="1991",
 isbn="978-3-540-47599-6",
   doi={10.1007/3540543961_21}
@@ -119,8 +109,9 @@ isbn="978-3-540-47599-6",
 
 @phdthesis{bezansonthesis,
   author       = {Jeff Bezanson}, 
-  title        = {Abstraction in Technical Computing},
+  title        = {Abstraction in technical computing},
   school       = {Massachusetts Institute of Technology },
+  url={http://dspace.mit.edu/handle/1721.1/7582},
   year         = 2015,
 }
 
@@ -129,39 +120,41 @@ isbn="978-3-540-47599-6",
   author    = {Joshua Dunfield},
   title     = {Elaborating intersection and union types},
   journal   = {J. Funct. Program.},
-  volume    = {24},
-  number    = {2-3},
-  pages     = {133--165},
   year      = {2014},
   doi       = {10.1017/S0956796813000270},
-  timestamp = {Sat, 27 May 2017 14:24:34 +0200},
-  biburl    = {https://dblp.org/rec/bib/journals/jfp/Dunfield14},
-  bibsource = {dblp computer science bibliography, https://dblp.org}
 }
 
 
 @inproceedings{DBLP:conf/vmcai/Pearce13,
   author    = {David J. Pearce},
   title     = {Sound and Complete Flow Typing with Unions, Intersections and Negations},
-  booktitle = {Verification, Model Checking, and Abstract Interpretation, 14th International
-               Conference, {VMCAI} 2013, Rome, Italy, January 20-22, 2013. Proceedings},
-  pages     = {335--354},
+  booktitle = {Verification, Model Checking, and Abstract Interpretation {VMCAI}},
   year      = {2013},
-  doi       = {10.1007/978-3-642-35873-9\_21},
-  timestamp = {Tue, 14 May 2019 10:00:43 +0200},
-  biburl    = {https://dblp.org/rec/bib/conf/vmcai/Pearce13},
-  bibsource = {dblp computer science bibliography, https://dblp.org}
+  doi       = {10.1007/978-3-642-35873-9_21}
 }
 
 @inproceedings{DBLP:conf/tacs/Damm94,
   author    = {Flemming M. Damm},
   title     = {Subtyping with Union Types, Intersection Types and Recursive Types},
-  booktitle = {Theoretical Aspects of Computer Software, International Conference
-               {TACS} '94, Sendai, Japan, April 19-22, 1994, Proceedings},
-  pages     = {687--706},
+  booktitle = {Theoretical Aspects of Computer Software {TACS}},
   year      = {1994},
-  doi       = {10.1007/3-540-57887-0\_121},
-  timestamp = {Tue, 14 May 2019 10:00:51 +0200},
-  biburl    = {https://dblp.org/rec/bib/conf/tacs/Damm94},
-  bibsource = {dblp computer science bibliography, https://dblp.org}
+  doi       = {10.1007/3-540-57887-0_121},
 }
+
+@inproceedings{yuliasubtyping,
+  author = {Julia Belyakova},
+  year = {2019}, 
+  title = {Decidable Tag-Based Semantic Subtyping for Nominal Types, Tuples, and Unions},
+  booktitle = {Proceedings of the 21st Workshop on Formal Techniques for Java-like Programs {FTFJP}}
+}
+@misc{tateemail,
+  author = {Ross Tate},
+  date = "2018-11-27",
+  howpublished = "personal communication"
+}
+@article{unionexptime,
+ author = {Hosoya, Haruo and Vouillon, J{\'e}r\^{o}me and Pierce, Benjamin C.},
+ title = {Regular Expression Types for XML},
+ journal = {ACM Trans. Program. Lang. Syst.},
+ year = {2005}
+} 
