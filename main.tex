@@ -104,7 +104,7 @@ used for method dispatch. While Julia is  dynamically typed,
 method arguments can have type annotations. These 
 annotations allow one method to be implemented by multiple functions.
 At run time, Julia searches for the most specific 
-applicable function  for a given invocation.  Consider theese declarations of multiplication:
+applicable function for a given invocation.  Consider these declarations of multiplication:
 
 \begin{lstlisting}
  *(x::Number, r::Range)  = range(x*first(r),...)
@@ -113,7 +113,7 @@ applicable function  for a given invocation.  Consider theese declarations of mu
 \end{lstlisting}
 
 \noindent The first two methods implement, respectively, multiplicaton of 
-range by a number and generic numeric multiplication. The
+a range by a number and generic numeric multiplication. The
 third method invokes native multiplication when both arguments are either
 signed or unsigned integers (but not a mix of the two). Julia uses subtyping
 to decide which of the methods to call at any specific site. The call
@@ -123,8 +123,8 @@ Julia offers programmers a rich type language to express complex
 relationships in type signatures. The type language includes nominal
 primitive types, union types, existential types, covariant tuples, invariant
 parametric datatypes, and singletons. Intuitively, subtyping between types
-is based on semantics subtyping, the subtyping relation between types holds
-when the sets of values they denote are a subset of one
+is based on semantic subtyping: the subtyping relation between types holds
+when the sets of values they denote are subsets of one
 another~\cite{BezansonEKS17}. We write the set of values represented by a
 type $t$ as {\small $\denotes{t}$}. Under semantic subtyping, the types
 $t_1$ and $t_2$ are subtypes iff {\small $\denotes{t_1} \subseteq
@@ -256,7 +256,7 @@ The first of these can be concluded without
 issue, producing the constraint {\small$\union{t}{t'} <: T$}. However, this
 constraint on $T$ is retained for checking the reverse direction,
 which is where problems arise. When checks the reverse direction,
-the aglorithm has to prove that
+the algorithm has to prove that
 {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}, and in turn either
 {\small$T<:t$} or {\small$T<:t'$}. All of these are unprovable under the
 assumption that {\small$\union{t}{t'} <: T$}.
