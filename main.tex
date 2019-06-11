@@ -1108,18 +1108,18 @@ invariant type constructors induce contravariant subtyping, which when
 combined with existential variables may create cycles within the subtyping
 relation.  
 
-\section{Conclusion}
-
-It is likely that subtyping with unions and tuples is always going to be
-exponential time, as closely related subtyping problems have been proven
-to be EXPTIME-complete~\cite{unionexptime}. However, it need not take
-exponential space to decide subtyping: we have described and proven 
-correct a subtyping algorithm for covariant tuples and unions that uses 
-iterators instead of normalization. This algorithm is practically faster
-and allows the introduction of additional logical optimizations within the
-subtyping algorithm, allowing for further speed improvements. Finally, 
-based on Julia's experience with the algorithm, we think that it can generalize
-to rich type languages.
+\section{Conclusion} It is likely that subtyping with unions and tuples is
+always going to be exponential time, as subtyping of regular expression types
+have been proven to be EXPTIME-complete~\cite{unionexptime}. However, it need
+not take exponential space to decide subtyping: we have described and proven
+correct a subtyping algorithm for covariant tuples and unions that uses
+iterators instead of normalization. This algorithm uses linear space and
+allows common patterns, such as testing if a tuple of primitives is a subtype
+of a tuple of unions, to be handled as a special case of the subtyping
+algorithm. Finally, based on Julia's experience with the algorithm, we think
+that it can generalize to rich type languages; Julia supports bounded
+polymorphism and invariant constructors enabled in part by its use of this
+algorithm.
 
 
 
