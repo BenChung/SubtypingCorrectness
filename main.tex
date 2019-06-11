@@ -71,44 +71,40 @@
   subtyping algorithm is surprisingly complex, and determining whether it is
   correct remains an open question. In this paper, we focus on one piece of
   this problem: the interaction between union types and covariant
-  tuples. Previous work normalized unions inside tuples to disjunctive normal form
-  ahead of time. However, normalization-based algorithms suffer from two problems: complex type signatures induce space explosion, and interactions between normalization and other features of Julia’s type system render such algorithms incorrect. In this paper, we describe the algorithm that Julia
-  uses to compute subtyping between tuples and unions---an algorithm that is immune to these issues of space explosion
-  and expressiveness.  We prove this algorithm correct and complete against a semantic-subtyping denotational model in Coq.
+  tuples. Previous work normalized unions inside tuples to disjunctive normal form. However, this strategy has two drawbacks: complex type signatures induce space explosion, and interference between normalization and other features of Julia’s type system. In this paper, we describe the algorithm that Julia
+  uses to compute subtyping between tuples and unions---an algorithm that is immune to space explosion
+  and plays well with other features of the language.  We prove this algorithm correct and complete against a semantic-subtyping denotational model in Coq.
 \end{abstract}
 
 \section{Introduction}
 
 Union types, originally introduced by Barbanera and
-Dezani-Ciancaglini~\cite{barbanera1991intersection}, are increasingly being
-used in mainstream languages. In some cases, such as Julia~\cite{BezansonEKS17}
-or TypeScript~\cite{typescript}, they are exposed at the source level. In
-others, such as Hack~\cite{hack}, they are only used as part of
-type inference. As a result of this increasing use of union types, both as
-expressibility aids and for type inference, subtyping between union types is of increasing
-practical import. 
+Dezani-Ciancaglini~\cite{barbanera1991intersection}, are being adopted in
+mainstream languages. In some cases, such as Julia~\cite{BezansonEKS17} or
+TypeScript~\cite{typescript}, they are exposed at the source level. In
+others, such as Hack~\cite{hack}, they are only used internally as part of
+type inference. As a result, subtyping algorithms between union types are of
+increasing practical import.  The standard subtyping algorithm for this
+combination of features has, for some time, been
+exponential in both time and space. An alternative algorithm, linear in
+space but still exponential in time, has been tribal knowledge in the
+subtyping community~\cite{tateemail}. In this paper, we describe and prove
+correct an implementation of that algorithm.
 
-The standard subtyping algorithm for the combination of distributive union and
-tuple types has, for some time, been exponential in both time and space. An
-alternative algorithm, linear in space but still exponential in time, has been
-tribal knowledge in the subtyping community~\cite{tateemail}. In this paper,
-we describe and prove correct an implementation of this algorithm.
-
-We observed the algorithm as part of our prior work formalizing the Julia
-subtyping relation~\cite{DBLP:NardelliBPCBV18}. In that work, we described
+We observed the algorithm in our prior work formalizing the Julia
+subtyping relation~\cite{DBLP:NardelliBPCBV18}. There, we described
 Julia's subtyping relation as it arose from its decision procedure but
-were unable to formalize it or prove it correct. Indeed, we found bugs in the
+were unable to prove it correct. Indeed, we found bugs in the
 Julia implementation and identified unresolved correctness issues. Contemporary
 work addresses some correctness concerns~\cite{yuliasubtyping} but leaves algorithmic
-correctness as an open problem.
+correctness  open.
 
-Julia's subtyping algorithm~\cite{bezansonthesis} is an important part of its
-semantics, used as part of method dispatch. While Julia is a dynamically typed
-language, methods can add type annotations to their arguments. These type
-annotations allow multiple functions to be defined for a single method
-declaration. At run time, Julia will search for the most specific (according to
-subtyping) applicable function that applies for a given invocation.  For
-example, the following snippet shows three declarations of multiplication:
+Julia's subtyping algorithm~\cite{bezansonthesis} is
+used for method dispatch. While Julia is  dynamically typed,
+method arguments can have type annotations. These 
+annotations allow one method to be implemented by multiple functions.
+At run time, Julia searches for the most specific 
+applicable function  for a given invocation.  Consider theese declarations of multiplication:
 
 \begin{lstlisting}
  *(x::Number, r::Range)  = range(x*first(r),...)
@@ -116,45 +112,41 @@ example, the following snippet shows three declarations of multiplication:
  *(x::T, y::T) where T <: Union{Signed,Unsigned} =  mul_int(x,y)
 \end{lstlisting}
 
-\noindent The first two methods implement, respectively, the case where a
-range is multiplied by a number and the case of generic numeric multiplication. The
+\noindent The first two methods implement, respectively, multiplicaton of 
+range by a number and generic numeric multiplication. The
 third method invokes native multiplication when both arguments are either
-signed or unsigned integers (but not a mix of the two). Julia will use subtyping
-to decide which of the methods will be used for any specific invocation. The call
-\c{1*(1:4)} will be dispatched to the first, \c{1*1.1} the second, and \c{1*1} the third.
+signed or unsigned integers (but not a mix of the two). Julia uses subtyping
+to decide which of the methods to call at any specific site. The call
+\c{1*(1:4)} dispatches to the first, \c{1*1.1} the second, and \c{1*1} the third.
 
-Julia offers programmers a rich type language to express complex relationships
-in type signatures. The Julia type language includes nominal primitive types,
-union types, existential types, covariant tuples, invariant parametric
-datatypes, and singletons. These types are all widely used in libraries, but
-subtyping between them poses substantial challenges. 
+Julia offers programmers a rich type language to express complex
+relationships in type signatures. The type language includes nominal
+primitive types, union types, existential types, covariant tuples, invariant
+parametric datatypes, and singletons. Intuitively, subtyping between types
+is based on semantics subtyping, the subtyping relation between types holds
+when the sets of values they denote are a subset of one
+another~\cite{BezansonEKS17}. We write the set of values represented by a
+type $t$ as {\small $\denotes{t}$}. Under semantic subtyping, the types
+$t_1$ and $t_2$ are subtypes iff {\small $\denotes{t_1} \subseteq
+  \denotes{t_2}$}. From this, we derive a \emph{forall-exists} intuition for
+subtyping: for every value denoted on the left-hand side, there must exist
+some value on the right-hand side to match it, thereby establishing the
+subset relation. This simple intuition is, however, complicated to check
+algorithmically.
 
-The intuition for subtyping in Julia arises primarily from semantic
-subtyping~\cite{BezansonEKS17}, which states that a subtyping relation between
-two types is equivalent to a subset relation between their denoted  sets of
-values. To formally describe the semantic definition of subtyping, we write
-the set of values represented by a type $t$ as {\small $\denotes{t}$}. Under
-semantic subtyping, the types $t_1$ and $t_2$ are subtypes iff {\small
-$\denotes{t_1} \subseteq \denotes{t_2}$}. From this, we derive a \emph{forall-
-exists} intuition for subtyping: for every value denoted on the left-hand
-side, there must exist some value on the right-hand side to match it, thereby
-establishing the subset relation. This simple intuition can, however, be
-complicated to check algorithmically.
-
-In this paper, we will focus on the interaction of two features: covariant
-tuples and union types. These two kinds of type are very important to Julia's
-semantics, as both factor heavily into method dispatch. Julia does not record
-function return types, so a function's signature consists solely of the
+In this paper, we focus on the interaction of two features: covariant
+tuples and union types. These two kinds of type are important to Julia's
+semantics. Julia does not record
+return types, so a function's signature consists solely of the
 tuple of its argument types. These tuples are covariant, as a function with
-more specific arguments (a property decided using subtyping) is preferred to a
+more specific arguments  is preferred to a
 more generic one. Union types are widely used as shorthand to avoid writing
 multiple functions with the same body. As a consequence, Julia library
 developers write many functions with union typed arguments, functions whose
-relative specificity must be decided using subtyping.
-
-This paper documents the first steps towards proving the correctness of
-Julia's subtyping algorithm. To do so, we first examine typical approaches
-to decide subtyping in the presence of union types. Based on Vouillon~\cite{Vouillon04},
+relative specificity must be decided using subtyping. To prove
+the correctness of
+the subtyping algorithm, we first examine typical approaches
+in the presence of union types. Based on Vouillon~\cite{Vouillon04},
 the following is a typical deductive system for subtyping union types:
 
 \vspace{-4mm}{\small\begin{mathpar}
@@ -179,7 +171,7 @@ not match the semantic intuition for subtyping. For instance, consider the follo
 \vspace{-6mm}
 %
 
-\noindent Using the semantic subtyping intuition, the judgment should hold.
+\noindent Using semantic subtyping, the judgment should hold.
 The set of values denoted by a union {\small $\denotes{\union{t_1}{t_2}}$} is
 just the union of the set of values denoted by each of its members {\small
 $\denotes{t_1} \cup \denotes{t_2}$}. A tuple {\small $\tuple{t_1,t_2}$}'s
@@ -192,7 +184,7 @@ $\llbracket \tuple{t', t} \rrbracket \cup \llbracket \tuple{t'', t}
 \rrbracket$} or equivalently {\small $\{\tuple{v',v''} ~|~ v' \in  \llbracket
 t' \rrbracket \cup \llbracket t'' \rrbracket \wedge v'' \in \llbracket t
 \rrbracket\}$}. These sets are the same, and therefore subtyping should hold
-in either direction between the left- and right- hand types. However, we cannot
+in either direction between the left- and right-hand types. However, we cannot
 derive this relation from the above rules. According to them, we must pick
 either {\small $t'$} or {\small $t''$} on the right-hand side using \textsc{existL} or
 \textsc{existR}, respectively, ending up with either {\small $\tuple{\union{t'}{t''},
@@ -200,31 +192,27 @@ t} \sub \tuple{t', t}$} or {\small $\tuple{\union{t'}{t''}, t} \sub
 \tuple{t'', t}$}. In either case, the judgment does not hold. How can this
 problem be solved?
 
-The majority of prior work addresses this problem by means of normalization.
-Normalization entails rewriting all types into their disjunctive normal form,
+Most prior work addresses this problem by normalization\cite{barbanera1991intersection,Pierce1991,aiken1991implementing},  
+rewriting all types into their disjunctive normal form,
 as unions of union-free types, \emph{before} building the derivation. Now all
 choices are made at the top level, avoiding the structural entanglements that
-cause trouble. The correctness of this rewriting step comes from the semantic
+cause difficulties. The correctness of this rewriting step comes from the semantic
 denotational model, and the resulting subtyping algorithm can be proved both
 correct and complete.
-
-Much of the early work~\cite{barbanera1991intersection,Pierce1991,aiken1991implementing} used
-normalization to decide distributive subtyping between union types, while
-other designs, such as Vouillon~\cite{Vouillon04} and Dunfield~\cite{DBLP:journals/jfp/Dunfield14}, do not handle distributivity. 
-In modern approaches,  normalization remains popular. It is
-relied upon by Frisch et al.'s\ work on semantic subtyping~\cite{Frisch08}, by Pearce's
+Other proposals, such as Vouillon~\cite{Vouillon04} and Dunfield~\cite{DBLP:journals/jfp/Dunfield14}, do not handle distributivity. 
+Normalization is used
+by Frisch et al.'s~\cite{Frisch08}, by Pearce's
 flow-typing algorithm~\cite{DBLP:conf/vmcai/Pearce13}, and by
 Muehlboeck and Tate in their general framework for union and intersection
 types~\cite{muehlboeck2018empowering}. Few alternatives have been proposed, with
 one example being Damm's reduction of subtyping to regular tree
-expression inclusion~\cite{DBLP:conf/tacs/Damm94}. However, a normalization-based
-algorithm has two major drawbacks: it is not space efficient, and
-other features of Julia render it incorrect.
+expression inclusion~\cite{DBLP:conf/tacs/Damm94}. 
 
-The first drawback is caused because normalization can create exponentially
-large types. Real-world Julia code~\cite{DBLP:NardelliBPCBV18} has types like the
-following whose normal form has 32,768
-constituent union-free types, making it impractical to store or compute with:
+However, a normalization-based algorithm has two major drawbacks: it is not
+space efficient, and other features of Julia render it incorrect.  The first
+drawback is caused because normalization can create exponentially large
+types. Real-world Julia code~\cite{DBLP:NardelliBPCBV18} has types like the
+following whose normal form has 32,768 constituent union-free types:
 
 \vspace{-2mm}
 \begin{small}
@@ -238,22 +226,17 @@ constituent union-free types, making it impractical to store or compute with:
 \end{small}
 \vspace{-2mm}
 
-The second drawback arises because Julia supports type-invariant
-constructors, which are incompatible with normalization of unions. For example,
-the type $\arrayt{\xt{Int}}$ is an array of integers, and is not a
-subtype of $\arrayt{\xt{Any}}$. This seemingly simple type system feature, in
-conjunction with type variables, makes normalization ineffective.  Consider
-the type {\small \(\arrayt{\union{t'}{t''}}\)}. This type denotes the set of
-arrays whose elements are either of type {\small $t'$} or {\small $t''$}.
-It would be incorrect to rewrite it as {\small
-  \(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as this latter type denotes the
-set of arrays whose elements are either all of type {\small $t'$} or all of
-type {\small$t''$}. A weaker disjunctive normal form, only lifting union
-types inside each invariant constructor, can circumvent this
-problem. However, doing so only reveals a deeper problem caused by the additional presence
-of existential types alongside invariant constructors. 
-
-Consider the following judgment:
+\noindent
+The second drawback arises because of type-invariant constructors. For
+example, $\arrayt{\xt{Int}}$ is an array of integers, and is not a subtype
+of $\arrayt{\xt{Any}}$. In conjunction with type variables, this makes
+normalization ineffective.  Consider {\small \(\arrayt{\union{t'}{t''}}\)},
+the set of arrays whose elements are either {\small $t'$} or {\small $t''$}.
+It wrong to rewrite it as {\small \(\union{\arrayt{t'}}{\arrayt{t''}}\)}, as
+this denotes the set of arrays whose elements are either all {\small $t'$}
+or {\small$t''$}. A weaker disjunctive normal form, only lifting union types
+inside each invariant constructor, is a partial solution.  However, this
+reveals a deeper problem caused by existential types. Consider the judgment:
 
 %
 \vspace{-4mm}{\small\[
@@ -261,34 +244,31 @@ Consider the following judgment:
 \]}\vspace{-4mm}
 %
 
-\noindent  This judgment holds if the existential variable {\small$T$} is instantiated with
-{\small $\union{t}{t'}$}, and therefore our algorithm should conclude it
-holds. Since all types are in invariant-constructor weak normal form, an algorithm based on the
-standard system of judgment rules would strip off the array type constructors
-and proceed.  However, since type constructors are invariant on their
-arguments, the algorithm must first test that the relation holds in the original order
-(that {\small$\union{\tuple{t}}{\tuple{t}}<:\tuple{T}$}) and in the
-reverse order (that {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}).
-
-The subtype check conducted in the original order can be concluded without
+\noindent  It holds if the existential variable {\small$T$} is instantiated with
+{\small $\union{t}{t'}$}.
+If types are in invariant-constructor weak normal form, an algorithm 
+would strip off the array type constructors
+and proceed.  However, since type constructors are invariant, 
+the algorithm must test that both
+{\small$\union{\tuple{t}}{\tuple{t}}<:\tuple{T}$} and 
+{\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$} hold.
+The first of these can be concluded without
 issue, producing the constraint {\small$\union{t}{t'} <: T$}. However, this
-constraint on $T$ is stored for checking the reverse direction of subtyping,
-which is where the problems arise. When the algorithm checks the opposite
-subtype order, it ends up having to prove that
+constraint on $T$ is retained for checking the reverse direction,
+which is where problems arise. When checks the reverse direction,
+the aglorithm has to prove that
 {\small$\tuple{T}<:\union{\tuple{t}}{\tuple{t'}}$}, and in turn either
 {\small$T<:t$} or {\small$T<:t'$}. All of these are unprovable under the
 assumption that {\small$\union{t}{t'} <: T$}.
-
 The key to deriving a successful judgment for this relation is to rewrite the
 right-to-left check into {\small$\tuple{T}<:\tuple{\union{t}{t'}}$}, which is
 provable. This \emph{anti-normalization} rewriting must be performed on
 sub-judgments of the derivation; to the best of our knowledge it is not
 part of any subtyping algorithm based on ahead-of-time disjunctive
-normalization. As a result, straightforward normalization, even to a relaxed
-normal form, is incompatible with the full Julia type system.
+normalization. 
 
 Julia's subtyping algorithm avoids these problems, but it is difficult to
-determine how: the complete Julia subtyping algorithm is implemented in close to
+determine how: the complete subtyping algorithm is implemented in close to
 two thousand lines of highly optimized C code. In this paper, we describe and
 prove correct only one part of that algorithm: the technique used to avoid
 space explosion while dealing with union types and covariant tuples. This is
@@ -307,7 +287,7 @@ designs.
 
 \medskip
 Our mechanized proof is available at: {\small\url{benchung.github.io/subtype-artifact}}.
-%\newpage
+
 
 \section{A space-efficient subtyping algorithm}
 
@@ -320,14 +300,15 @@ type typ =   Prim of int  | Tuple of typ * typ  | Union of typ * typ
 \end{lstlisting}
 \medskip
 
+\noindent
 We define subtyping for primitives as the identity, so $p_i <: p_i$.
 
 \subsection{Normalization}\label{normalize}
 
-To explain the operation of the space-efficient algorithm, we will first
+To explain the operation of the space-efficient algorithm, we first
 describe how normalization can be used as part of subtyping. Normalization
 rewrites types to move all internal unions to the top level. The resultant
-term will then consist of a union of union-free terms. Consider the following
+term consists of a union of union-free terms. Consider the following
 relation:
 
 \medskip
@@ -389,6 +370,7 @@ let rec norm = function
   | Union t t' -> (norm t) @ (norm t')
 \end{lstlisting}
 
+\noindent
 However, as previously described, this expansion is space-inefficient. Julia's
 algorithm is more complicated, but avoids having to pre-compute the set of normalized
 types as \c{norm} does. 
@@ -404,13 +386,14 @@ $\tuple{ \union{ \union{p_2}{p_3} }{p_1}, \union{p_3}{p_2}}$
 \medskip
 
 \noindent
-we want an algorithm that will check the following tuples,
+we want an algorithm that checks the following tuples,
 
 \medskip
 \noindent $\tuple{p_2,p_3}, ~ \tuple{p_2,p_2}, ~ \tuple{p_1,p_3}, ~ \tuple{p_1,p_2}, ~
   \tuple{p_3,p_3}, ~ \tuple{p_3,p_2}$
-\medskip
+\vspace{-1mm}
 
+\noindent
 without having to compute and store all of them ahead-of-time. This algorithm
 should be able to generate each tuple on-demand while still being guaranteed to 
 explore every tuple of the original type's normal form.
@@ -479,6 +462,7 @@ let rec next(a:typ)(l:choice list) =
    | None -> None
    | Some(l') -> Some(fst (pad a l'))
 \end{lstlisting}
+\newpage
 
 \noindent
 The \c{step} function delegates the job of flipping the last occurrence of
@@ -553,7 +537,7 @@ sequence starting at \c f. This is achieved by recursively testing that for
 each union-free type term in \c a (induced by \c a and the current value of
 \c f), there exists a union-free super-type in \c b.
 
-\newpage
+
 \begin{lstlisting}
 let rec allexist(a:typ)(b:typ)(f:choice list) =
   match exist a b f (initial b) with 
@@ -589,11 +573,11 @@ types are not subtypes, or \c{IsSub(_,_)} when they are subtypes. If the two typ
 are primitives, then they are only subtypes if they are equal. If the types
 are tuples, they are subtypes if each of their respective elements are subtypes. Note
 that the return type of \c{sub}, when successful, holds the unused choice
-strings for both type arguments. When encountering a union, \c{sub} will
-follow the choice strings to decide which branch to take. Consider, for
+strings for both type arguments. When encountering a union, \c{sub} 
+follows the choice strings to decide which branch to take. Consider, for
 instance, the case when the first type term is \c{Union(t1,t2)} and the
 second is type \c{t}. If the first element of the choice string is an \L,
-then \c{t1} and \c{t} will be checked, otherwise \c{sub} will check \c{t2}
+then \c{t1} and \c{t} are checked, otherwise \c{sub} checks \c{t2}
 and \c{t}.
 
 \begin{lstlisting}
@@ -629,7 +613,7 @@ To prove the correctness of Julia's subtyping, we take the following general
 approach. We start by giving a denotational semantics for types from which
 we derive a definition of semantic subtyping. Then we easily prove that a
 normalization-based subtyping algorithm is correct and complete. This provides
-the general framework for which we will prove two iterator-based algorithms correct.
+the general framework for which we prove two iterator-based algorithms correct.
 The first iterator-based algorithm explicitly includes the structure of the type in
 its state to guide iteration; the second is identical to that of the prior section.
 
@@ -668,10 +652,10 @@ The use of equality for relating types is a simplification afforded by the
 structure of primitives.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Subtyping with Normalization}
+\subsection{Subtyping with normalization}
 
 The correctness and completeness of the normalization-based subtyping
-algorithm of Section~\ref{norm} requires proving that the \c{norm}
+algorithm requires proving that the \c{norm}
 function returns all union-free type terms.
 
 \begin{lemma}[NF Equivalence]\label{lem:equiv_ndet}
@@ -693,7 +677,7 @@ Therefore, normalization-based subtyping is correct against our definition.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Subtyping with Tree Iterators}
+\subsection{Subtyping with tree iterators}
 
 Reasoning about iterators that use choice strings, as described in
 Section~\ref{cs}, is tricky as it requires simultaneously reasoning about
@@ -745,8 +729,8 @@ right-to-left order. There are four cases to consider:
   \item A tuple steps its second child; if that
 has no successor step, then it steps its first child and resets the second
 child.
-  \item An \c{ILeft} will try to step its child. If it has no successor, then the \c{ILeft} will become an \c{IRight} with a newly initialized child corresponding to the right child of the union.
-  \item An \c{IRight} will also try to step its child, but will be final if its child has no successor.
+  \item An \c{ILeft} tries to step its child. If it has no successor, then the \c{ILeft} becomes an \c{IRight} with a newly initialized child corresponding to the right child of the union.
+  \item An \c{IRight} also tries to step its child, but is final if its child has no successor.
   \end{itemize}
 
 \begin{lstlisting}
@@ -783,7 +767,7 @@ iterator states for a given type. First, we show that iterators eventually
 reach a final state. This is done with a function \c{inum}, which assigns
 natural numbers to each state. It simply counts the number of remaining
 steps in the iterator. To count the total number of union-free types 
-denoted by a type, it will use the \c{tnum} helper function.
+denoted by a type, we use the \c{tnum} helper function.
 
 \begin{lstlisting}
 Fixpoint tnum(t:Typ):nat :=
@@ -926,7 +910,7 @@ $\irch{\c{initial}~a}{a} = \denotes{a}$.
 
 \noindent
 Next, Theorem~\ref{indprop} allows us to show that \c{exists} of $a$, $b$,
-with $i_a$ and $i_b$ will try to find an iterator state $i_b'$ starting from
+with $i_a$ and $i_b$  tries to find an iterator state $i_b'$ starting from
 $i_b$ such that $b(i_b') = a(i_a)$. The desired property trivially holds
 when $\irch{i_b}{b} = \emptyset$, and if the iterator can step then either
 the current union-free type is satisfying or we defer to the induction
@@ -939,7 +923,7 @@ $\c{exist}\;a\;b\;i_a\;i_b$ holds iff $\exists t\in\irch{i_b}{b},a(i_a)= t$.
 
 \noindent
 We can then appeal to both Theorem~\ref{trexcor} and Lemma~\ref{triter_eq}
-to show that $\c{exist}\;a\;b\;i_a\;(\c{initial}\;b)$ will find a satisfying
+to show that $\c{exist}\;a\;b\;i_a\;(\c{initial}\;b)$ finds a satisfying
 union-free type on the right-hand side if it exists in $\denotes{b}$. Using
 this, we can then use Theorem~\ref{indprop} in an analogous way to \c{exist}
 to show that \c{allexist} is correct up to the current iterator state.
@@ -951,7 +935,7 @@ $\c{allexist}\;a\;b\;i_a$ holds iff $\forall a'\in \irch{i_a}{a},
 
 \noindent
 Finally, we can appeal to Theorem~\ref{trfacor} and Lemma~\ref{triter_eq}
-again to show the subtyping algorithm to be correct.
+again to show correctness of  the algorithm.
 
 \begin{theorem}
 $\c{subtype}\;a\;b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
@@ -959,13 +943,12 @@ $\c{subtype}\;a\;b$ holds iff $\forall a' \in \denotes{a}, \exists b' \in
 \end{theorem}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Subtyping with Choice Strings}
+\subsection{Subtyping with choice strings}
 
-We prove the subtyping algorithm using choice strings correct and complete. To
-do so, we first show that iterators over choice strings simulate tree iterators. 
-This then lets us prove that the choice string based subtyping algorithm is correct
+We prove the subtyping algorithm using choice strings correct and complete. We
+start by showing that iterators over choice strings simulate tree iterators. 
+This lets us prove that the choice string based subtyping algorithm is correct
 by showing that the iterators at each step are equivalent.
-
 To relate tree iterators to choice string iterators, we use the \c{itp}
 function, which traverses a tree iterator state and linearizes it, producing a
 choice string using depth-first search.
@@ -1088,9 +1071,9 @@ union-free tuple. As a result, all that Julia needs to do is find one matching
 tuple in $t_1 ... t_n$, which can be done sequentially without needing explicit
 enumeration.
 
-\section{Future Work}
+\section{Future work}
 
-We plan to handle additional features of the Julia language in the future. Our
+We plan to handle additional features of Julia. Our
 next steps will be subtyping for primitive types, existential type variables,
 and invariant constructors.  Adding subtyping to primitive types would be the
 simplest change. The challenge is how to retain completeness, as a primitive
